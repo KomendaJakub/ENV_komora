@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
+
 # Imports
-import smbus
 import time
 
-# Function definitions
+# Function definitions()
+
+
 def get_measurement():
-# Get I2C bus
+    import smbus
+    # Get I2C bus
     bus = smbus.SMBus(1)
     bus.write_i2c_block_data(0x45, 0x2C, [0x06])
     time.sleep(0.5)
@@ -18,3 +21,7 @@ def get_measurement():
     cTemp = -45 + (175 * temp / 65535.0)
     return cTemp
 
+
+def get_measurement_test():
+    import random
+    return random.randint(0, 100)
