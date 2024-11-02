@@ -1,21 +1,18 @@
 #!/usr/bin/python3
-import sys
-
-
 import datetime as dt
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.ticker as ticker
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import tkinter as tk
-
+import sys
 
 if len(sys.argv) > 1 and sys.argv[1] == 'test':
     from sensor import get_measurement_test as get_measurement
 else:
     from sensor import get_measurement
 
-from temp_profile import get_profile, set_temp
+from temp_profile import get_profile, open_window
 
 
 def on_closing():
@@ -71,13 +68,18 @@ root = tk.Tk()
 root.geometry("800x480")
 root.protocol("WM_DELETE_WINDOW", root.destroy)
 
+frame_menu = tk.Frame(root)
+frame_menu.pack(side="top")
+
 frame_graph = tk.Frame(root)
 frame_graph.pack(side="bottom")
 
 
 # bt_start = tk.Button(frame_menu1, text="Start")
 # bt_start.grid(column=0, row=0, padx=1)
-
+bt_edit = tk.Button(frame_menu, text="Edit Profile",
+                    command=lambda: open_window(root))
+bt_edit.pack()
 
 canvas = FigureCanvasTkAgg(fig, master=frame_graph)
 canvas.get_tk_widget().pack()
