@@ -4,8 +4,6 @@ import os
 import csv
 import tkinter as tk
 
-
-HEADER_LINES = 4
 DIR_PATH = os.path.dirname(__file__)
 FILE_PATH = os.path.join(DIR_PATH, 'profile.csv')
 
@@ -16,11 +14,23 @@ entries = []
 def open_window(root):
 
     def refresh():
-        global entries
-        entries = []
+        for widget in menu.winfo_children():
+            widget.destroy()
+
+        l1 = tk.Label(menu, text="Time (HH:MM)")
+        l2 = tk.Label(menu, text="Temperature (C)")
+        add_time = tk.Entry(menu)
+        add_time.grid(row=0, column=0)
+        add_temp = tk.Entry(menu)
+        add_temp.grid(row=0, column=1)
+        bt_save = tk.Button(menu, text="Save", command=save)
+        bt_save.grid(row=0, column=2)
+        l1.grid(row=1, column=0)
+        l2.grid(row=1, column=1)
+
+        entries.clear()
         file = open(FILE_PATH)
         reader = csv.DictReader(file)
-
         # Skip 2 rows because of other objects
         i = 2
         for line in reader:
@@ -31,8 +41,17 @@ def open_window(root):
             e2.insert(0, line["temp"])
             e2.grid(row=i, column=1)
             entries.append([e1, e2])
+            bt_del = tk.Button(menu, text="Delete",
+                               command=lambda i=i: delete(i-2))
+            bt_del.grid(row=i, column=2)
             i += 1
         file.close()
+
+    def delete(index):
+        entries[index][0].destroy()
+        entries[index][1].destroy()
+        entries.pop(index)
+        save()
 
     def save():
 
@@ -41,6 +60,14 @@ def open_window(root):
             return int(hour)*100 + int(minute)
 
         entries.sort(key=lambda x: key(x[0].get()))
+
+        index = 0
+        while index < len(entries):
+            while (entries[index][0].get() == entries[index+1][0].get()):
+                entries.pop(index+1)
+                if index + 1 >= len(entries):
+                    break
+            index += 1
 
         file = open(FILE_PATH, 'w')
         fieldnames = ['time', 'temp']
@@ -61,16 +88,6 @@ def open_window(root):
     menu = tk.Frame(edit_window)
     menu.pack()
 
-    l1 = tk.Label(menu, text="Time (HH:MM)")
-    l2 = tk.Label(menu, text="Temperature (C)")
-    add_time = tk.Entry(menu)
-    add_time.grid(row=0, column=0)
-    add_temp = tk.Entry(menu)
-    add_temp.grid(row=0, column=1)
-    bt_save = tk.Button(menu, text="Save", command=save)
-    bt_save.grid(row=0, column=2)
-    l1.grid(row=1, column=0)
-    l2.grid(row=1, column=1)
     refresh()
 
 
