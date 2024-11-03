@@ -32,6 +32,12 @@ start_t = dt.datetime.now()
 # This function is called periodically from FuncAnimation
 
 
+def recalculate():
+    for i in range(len(xs)):
+        delta_t = dt.datetime.strptime(xs[i], "%H:%M:%S")
+        zs[i] = get_profile(delta_t)
+
+
 def animate(i, xs, ys):
 
     # Read temperature (Celsius) from TMP102
@@ -74,12 +80,14 @@ frame_menu.pack(side="top")
 frame_graph = tk.Frame(root)
 frame_graph.pack(side="bottom")
 
+bt_refresh = tk.Button(frame_menu, text="Refresh", command=recalculate)
+bt_refresh.grid(row=0, column=0)
 
 # bt_start = tk.Button(frame_menu1, text="Start")
 # bt_start.grid(column=0, row=0, padx=1)
 bt_edit = tk.Button(frame_menu, text="Edit Profile",
                     command=lambda: open_window(root))
-bt_edit.pack()
+bt_edit.grid(row=0, column=1)
 
 canvas = FigureCanvasTkAgg(fig, master=frame_graph)
 canvas.get_tk_widget().pack()

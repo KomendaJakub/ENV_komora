@@ -62,9 +62,8 @@ def open_window(root):
         entries.sort(key=lambda x: key(x[0].get()))
 
         index = 0
-        while index < len(entries):
+        while index < len(entries) - 1:
             while (entries[index][0].get() == entries[index+1][0].get()):
-                entries.pop(index+1)
                 if index + 1 >= len(entries):
                     break
             index += 1
