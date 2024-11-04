@@ -69,6 +69,10 @@ def open_window(root):
         index = 0
         while index < len(entries) - 1:
             while (entries[index][0].get() == entries[index+1][0].get()):
+
+                entries[index+1][0].destroy()
+                entries[index+1][1].destroy()
+                entries.pop(index+1)
                 if index + 1 >= len(entries):
                     break
             index += 1
@@ -89,9 +93,22 @@ def open_window(root):
     edit_window.title("Profile Editing")
     edit_window.geometry("800x480")
 
-    menu = tk.Frame(edit_window)
-    menu.pack()
+    main_frame = tk.Frame(edit_window)
+    main_frame.pack(fill="both", expand=1)
 
+    canvas = tk.Canvas(main_frame)
+    canvas.pack(side="left", fill="both", expand=1)
+
+    scrollbar = tk.Scrollbar(
+        main_frame, orient="vertical", command=canvas.yview)
+    scrollbar.pack(side="right", fill="y")
+
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    menu = tk.Frame(canvas)
+    canvas.create_window((0, 0), window=menu, anchor="n")
+    menu.bind('<Configure>', lambda e: canvas.configure(
+        scrollregion=canvas.bbox("all")))
     refresh()
 
 

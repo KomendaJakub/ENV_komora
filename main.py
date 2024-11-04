@@ -67,6 +67,11 @@ def export():
     msg.add_attachment(image, maintype='image',
                        subtype='png', filename="Figure.png")
 
+    with open('profile.csv', 'rb') as fb:
+        prof = fb.read()
+        msg.add_attachment(prof, maintype="text",
+                           subtype="csv", filename="profile.csv")
+
     with smtplib.SMTP_SSL(MAIL_SERVER, 465) as smtp:
         smtp.login(EMAIL, PASSWORD)
         smtp.send_message(msg)
