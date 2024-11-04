@@ -6,6 +6,8 @@ import matplotlib.ticker as ticker
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import tkinter as tk
 import sys
+import smtplib
+
 
 if len(sys.argv) > 1 and sys.argv[1] == 'test':
     from sensor import get_measurement_test as get_measurement
@@ -30,6 +32,9 @@ zs = []
 start_t = dt.datetime.now()
 
 # This function is called periodically from FuncAnimation
+
+
+def export():
 
 
 def recalculate():
@@ -88,7 +93,8 @@ bt_refresh.grid(row=0, column=0)
 bt_edit = tk.Button(frame_menu, text="Edit Profile",
                     command=lambda: open_window(root))
 bt_edit.grid(row=0, column=1)
-
+bt_export = tk.Button(frame_menu, text="Export", command=export)
+bt_export.grid(row=0, column=2)
 canvas = FigureCanvasTkAgg(fig, master=frame_graph)
 canvas.get_tk_widget().pack()
 

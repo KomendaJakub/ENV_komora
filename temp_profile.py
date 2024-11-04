@@ -7,13 +7,15 @@ import tkinter as tk
 DIR_PATH = os.path.dirname(__file__)
 FILE_PATH = os.path.join(DIR_PATH, 'profile.csv')
 
-global entries
+global entries, add_time, add_temp
 entries = []
 
 
 def open_window(root):
 
     def refresh():
+        global add_time, add_temp
+
         for widget in menu.winfo_children():
             widget.destroy()
 
@@ -54,6 +56,9 @@ def open_window(root):
         save()
 
     def save():
+
+        if add_time.get() and add_temp.get():
+            entries.append([add_time, add_temp])
 
         def key(time):
             hour, minute = time.split(":")
