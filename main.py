@@ -7,6 +7,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 import sys
 import smtplib
+from email.message import EmailMessage
+import csv
+from confidential import *
 
 
 if len(sys.argv) > 1 and sys.argv[1] == 'test':
@@ -35,6 +38,38 @@ start_t = dt.datetime.now()
 
 
 def export():
+    file = open("Export.csv", "w")
+    fieldnames = ['time', "measurement", "set_temp"]
+
+    writer = csv.DictWriter(file, fieldnames=fieldnames)
+    writer.writeheader()
+    for i in range(len(xs)):
+        writer.writerow(
+            {'time': xs[i], 'measurement': ys[i], 'set_temp': zs[i]})
+    file.close()
+
+    now = dt.datetime.now()
+    msg = EmailMessage()
+    msg.set_content("Environmental chamber measurement from " +
+                    now.strftime("%d/%m/%Y, %H:%M"))
+    msg['Subject'] = "ENV chamber " + now.strftime("%d/%m/%Y, %H:%M")
+    msg['From'] = EMAIL
+    msg['To'] = DESTINATION
+
+    with open("Export.csv", "rb") as fb:
+        data = fb.read()
+    msg.add_attachment(data, maintype='text',
+                       subtype='csv', filename="Raw.csv")
+
+    plt.savefig('figure.png', dpi=1200)
+    with open('figure.png', 'rb') as fb:
+        image = fb.read()
+    msg.add_attachment(image, maintype='image',
+                       subtype='png', filename="Figure.png")
+
+    with smtplib.SMTP_SSL(MAIL_SERVER, 465) as smtp:
+        smtp.login(EMAIL, PASSWORD)
+        smtp.send_message(msg)
 
 
 def recalculate():
