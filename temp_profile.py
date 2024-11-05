@@ -16,38 +16,36 @@ def open_window(root):
     def refresh():
         global add_time, add_temp
 
-        for widget in menu.winfo_children():
-            widget.destroy()
+        menu.pack_forget()
 
         l1 = tk.Label(menu, text="Time (HH:MM)")
+        l1.grid(row=1, column=0)
         l2 = tk.Label(menu, text="Temperature (C)")
+        l2.grid(row=1, column=1)
+
         add_time = tk.Entry(menu)
         add_time.grid(row=0, column=0)
         add_temp = tk.Entry(menu)
         add_temp.grid(row=0, column=1)
         bt_save = tk.Button(menu, text="Save", command=save)
         bt_save.grid(row=0, column=2)
-        l1.grid(row=1, column=0)
-        l2.grid(row=1, column=1)
 
         entries.clear()
-        file = open(FILE_PATH)
-        reader = csv.DictReader(file)
-        # Skip 2 rows because of other objects
-        i = 2
-        for line in reader:
-            e1 = tk.Entry(menu)
-            e1.insert(0, line["time"])
-            e1.grid(row=i, column=0)
-            e2 = tk.Entry(menu)
-            e2.insert(0, line["temp"])
-            e2.grid(row=i, column=1)
-            entries.append([e1, e2])
-            bt_del = tk.Button(menu, text="Delete",
-                               command=lambda i=i: delete(i-2))
-            bt_del.grid(row=i, column=2)
-            i += 1
-        file.close()
+
+        with open(FILE_PATH) as file:
+            reader = csv.DictReader(file)
+            # Skip 2 rows because of labels
+            for i, line in enumerate(reader, start=2):
+                time_entry = tk.Entry(menu)
+                time_entry.insert(0, line["time"])
+                time_entry.grid(row=i, column=0)
+                temp_entry = tk.Entry(menu)
+                temp_entry.insert(0, line["temp"])
+                temp_entry.grid(row=i, column=1)
+                entries.append([time_entry, temp_entry])
+                bt_del = tk.Button(menu, text="Delete",
+                                   command=lambda idx=i-2: delete(idx))
+                bt_del.grid(row=i, column=2)
 
     def delete(index):
         entries[index][0].destroy()
@@ -56,7 +54,7 @@ def open_window(root):
         save()
 
     def save():
-
+        global entries
         if add_time.get() and add_temp.get():
             entries.append([add_time, add_temp])
 
@@ -66,27 +64,23 @@ def open_window(root):
 
         entries.sort(key=lambda x: key(x[0].get()))
 
-        index = 0
-        while index < len(entries) - 1:
-            while (entries[index][0].get() == entries[index+1][0].get()):
-
-                entries[index+1][0].destroy()
-                entries[index+1][1].destroy()
-                entries.pop(index+1)
-                if index + 1 >= len(entries):
-                    break
-            index += 1
-
-        file = open(FILE_PATH, 'w')
-        fieldnames = ['time', 'temp']
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-
-        writer.writeheader()
+        unique_times = {}
         for entry in entries:
             time = entry[0].get()
-            temp = entry[1].get()
-            writer.writerow({'time': time, 'temp': temp})
-        file.close()
+            if time not in unique_times:
+                unique_times[time] = entry
+        entries = list(unique_times.values())
+
+        with open(FILE_PATH, 'w') as file:
+            fieldnames = ['time', 'temp']
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+
+            writer.writeheader()
+            for entry in entries:
+                time = entry[0].get()
+                temp = entry[1].get()
+                writer.writerow({'time': time, 'temp': temp})
+
         refresh()
 
     edit_window = tk.Toplevel(root)
@@ -109,27 +103,27 @@ def open_window(root):
     canvas.create_window((0, 0), window=menu, anchor="n")
     menu.bind('<Configure>', lambda e: canvas.configure(
         scrollregion=canvas.bbox("all")))
+
     refresh()
 
 
 def get_profile(time):
-    file = open(FILE_PATH)
-    reader = csv.DictReader(file)
+    if time is None:
+        return None
 
     last_temp = None
-    for row in reader:
-        hour, minute = row['time'].split(":")
-        prof_time = datetime(time.year, time.month,
-                             time.day, int(hour), int(minute))
+    with open(FILE_PATH) as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            hour, minute = map(int, row['time'].split(":"))
+            prof_time = datetime(time.year, time.month,
+                                 time.day, hour, minute)
 
-        if (prof_time > time):
-            if last_temp is None:
-                return None
-            return float(last_temp)
-        last_temp = float(row['temp'])
+            if (prof_time > time):
+                return float(last_temp) if last_temp is not None else None
+            last_temp = float(row['temp'])
 
-    if last_temp is None:
-        return None
+        return last_temp
 
 
 if __name__ == "__main__":

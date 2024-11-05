@@ -9,7 +9,7 @@ import sys
 import smtplib
 from email.message import EmailMessage
 import csv
-from confidential import *
+from confidential import EMAIL, PASSWORD, DESTINATION, MAIL_SERVER
 
 
 if len(sys.argv) > 1 and sys.argv[1] == 'test':
@@ -38,15 +38,15 @@ start_t = dt.datetime.now()
 
 
 def export():
-    file = open("Export.csv", "w")
-    fieldnames = ['time', "measurement", "set_temp"]
+    with open("Export.csv", "w"):
+        file = open("Export.csv", "w")
+        fieldnames = ['time', "measurement", "set_temp"]
 
-    writer = csv.DictWriter(file, fieldnames=fieldnames)
-    writer.writeheader()
-    for i in range(len(xs)):
-        writer.writerow(
-            {'time': xs[i], 'measurement': ys[i], 'set_temp': zs[i]})
-    file.close()
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for i in range(len(xs)):
+            writer.writerow(
+                {'time': xs[i], 'measurement': ys[i], 'set_temp': zs[i]})
 
     now = dt.datetime.now()
     msg = EmailMessage()
@@ -56,21 +56,21 @@ def export():
     msg['From'] = EMAIL
     msg['To'] = DESTINATION
 
-    with open("Export.csv", "rb") as fb:
+    with open('Export.csv', 'rb') as fb:
         data = fb.read()
     msg.add_attachment(data, maintype='text',
-                       subtype='csv', filename="Raw.csv")
+                       subtype='csv', filename='Raw.csv')
 
     plt.savefig('figure.png', dpi=1200)
     with open('figure.png', 'rb') as fb:
         image = fb.read()
     msg.add_attachment(image, maintype='image',
-                       subtype='png', filename="Figure.png")
+                       subtype='png', filename='Figure.png')
 
     with open('profile.csv', 'rb') as fb:
         prof = fb.read()
-        msg.add_attachment(prof, maintype="text",
-                           subtype="csv", filename="profile.csv")
+    msg.add_attachment(prof, maintype="text",
+                       subtype="csv", filename="profile.csv")
 
     with smtplib.SMTP_SSL(MAIL_SERVER, 465) as smtp:
         smtp.login(EMAIL, PASSWORD)
