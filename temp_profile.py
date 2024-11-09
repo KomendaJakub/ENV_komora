@@ -36,7 +36,8 @@ def open_window(root):
             reader = csv.DictReader(file)
             # Skip 2 rows because of labels
             for i, line in enumerate(reader, start=2):
-                time_entry = tk.Entry(menu)
+                time_entry = tk.Entry(
+                    menu)
                 time_entry.insert(0, line["time"])
                 time_entry.grid(row=i, column=0)
                 temp_entry = tk.Entry(menu)
@@ -89,6 +90,9 @@ def open_window(root):
 
     main_frame = tk.Frame(edit_window)
     main_frame.pack(fill="both", expand=1)
+
+#    status = tk.Label(root, text="", bd=1, relief=tk.SUNKEN, anchor=tk.W)
+#    status.pack(fill=tk.X, side=tk.TOP, ipady=2)
 
     canvas = tk.Canvas(main_frame)
     canvas.pack(side="left", fill="both", expand=1)

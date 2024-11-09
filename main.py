@@ -11,7 +11,6 @@ from email.message import EmailMessage
 import csv
 from confidential import EMAIL, PASSWORD, DESTINATION, MAIL_SERVER
 
-
 if len(sys.argv) > 1 and sys.argv[1] == 'test':
     from sensor import get_measurement_test as get_measurement
 else:
@@ -38,15 +37,30 @@ start_t = dt.datetime.now()
 
 
 def export():
-    with open("Export.csv", "w"):
-        file = open("Export.csv", "w")
-        fieldnames = ['time', "measurement", "set_temp"]
+    answer = tk.simpledialog.askstring(
+        "Email", "Insert and email address to which data will be exported", parent=root)
 
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writeheader()
-        for i in range(len(xs)):
-            writer.writerow(
-                {'time': xs[i], 'measurement': ys[i], 'set_temp': zs[i]})
+    if answer.strip() == '':
+        status.config(text="No email address inserted!", bg="red")
+        root.after(10000, clear_status)
+        return
+    else:
+        DESTINATION = answer
+
+    try:
+        with open("Export.csv", "w"):
+            file = open("Export.csv", "w")
+            fieldnames = ['time', "measurement", "set_temp"]
+
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            for i in range(len(xs)):
+                writer.writerow(
+                    {'time': xs[i], 'measurement': ys[i], 'set_temp': zs[i]})
+    except Exception as err:
+        print(err)
+        status.config(text="Could not open Export.csv for writing", bg="red")
+        root.after(10000, clear_status())
 
     now = dt.datetime.now()
     msg = EmailMessage()
@@ -56,25 +70,43 @@ def export():
     msg['From'] = EMAIL
     msg['To'] = DESTINATION
 
-    with open('Export.csv', 'rb') as fb:
-        data = fb.read()
-    msg.add_attachment(data, maintype='text',
-                       subtype='csv', filename='Raw.csv')
+    try:
+        with open('Export.csv', 'rb') as fb:
+            data = fb.read()
+        msg.add_attachment(data, maintype='text',
+                           subtype='csv', filename='Raw.csv')
 
-    plt.savefig('figure.png', dpi=1200)
-    with open('figure.png', 'rb') as fb:
-        image = fb.read()
-    msg.add_attachment(image, maintype='image',
-                       subtype='png', filename='Figure.png')
+        plt.savefig('figure.png', dpi=1200)
+        with open('figure.png', 'rb') as fb:
+            image = fb.read()
+        msg.add_attachment(image, maintype='image',
+                           subtype='png', filename='Figure.png')
 
-    with open('profile.csv', 'rb') as fb:
-        prof = fb.read()
-    msg.add_attachment(prof, maintype="text",
-                       subtype="csv", filename="profile.csv")
+        with open('profile.csv', 'rb') as fb:
+            prof = fb.read()
+        msg.add_attachment(prof, maintype="text",
+                           subtype="csv", filename="profile.csv")
 
-    with smtplib.SMTP_SSL(MAIL_SERVER, 465) as smtp:
-        smtp.login(EMAIL, PASSWORD)
-        smtp.send_message(msg)
+    except Exception as err:
+        print(err)
+        status.config(text="Could not open one of the export files", bg="red")
+        root.after(10000, clear_status)
+    try:
+        with smtplib.SMTP_SSL(MAIL_SERVER, 465) as smtp:
+            smtp.login(EMAIL, PASSWORD)
+            smtp.send_message(msg)
+    except Exception as err:
+        print(err)
+        status.config(
+            text="There was an error while sending the email, try again or save manually!")
+        root.after(30000, clear_status)
+
+    status.config(text="Email sent successfully!", bg="green")
+    root.after(10000, clear_status)
+
+
+def clear_status():
+    status.config(text="", bg=default_bg)
 
 
 def recalculate():
@@ -116,14 +148,20 @@ ani = animation.FuncAnimation(fig, animate, fargs=(xs, ys), interval=10000)
 
 # Initialize tkinter
 root = tk.Tk()
-root.geometry("800x480")
+# root.geometry("800x480")
 root.protocol("WM_DELETE_WINDOW", root.destroy)
 
+default_bg = root.cget('bg')
 frame_menu = tk.Frame(root)
 frame_menu.pack(side="top")
 
 frame_graph = tk.Frame(root)
 frame_graph.pack(side="bottom")
+
+status = tk.Label(root, text="", bd=1, relief=tk.SUNKEN,
+                  anchor=tk.N, justify=tk.CENTER)
+status.pack(fill=tk.X, side=tk.TOP, ipady=2)
+
 
 bt_refresh = tk.Button(frame_menu, text="Refresh", command=recalculate)
 bt_refresh.grid(row=0, column=0)
@@ -136,10 +174,10 @@ bt_edit.grid(row=0, column=1)
 bt_export = tk.Button(frame_menu, text="Export", command=export)
 bt_export.grid(row=0, column=2)
 canvas = FigureCanvasTkAgg(fig, master=frame_graph)
-canvas.get_tk_widget().pack()
+canvas.get_tk_widget().pack(fill=tk.BOTH)
 
 toolbar = NavigationToolbar2Tk(canvas, frame_graph, pack_toolbar=False)
 toolbar.update()
-toolbar.pack()
+toolbar.pack(side="bottom")
 
 root.mainloop()
