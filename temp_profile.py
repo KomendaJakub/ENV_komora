@@ -19,16 +19,16 @@ def open_window(root):
         menu.pack_forget()
 
         l1 = tk.Label(menu, text="Time (HH:MM)")
-        l1.grid(row=1, column=0)
+        l1.grid(row=1, column=0, padx=1, pady=1)
         l2 = tk.Label(menu, text="Temperature (C)")
-        l2.grid(row=1, column=1)
+        l2.grid(row=1, column=1, padx=1, pady=1)
 
         add_time = tk.Entry(menu)
-        add_time.grid(row=0, column=0)
+        add_time.grid(row=0, column=0, padx=2, pady=1)
         add_temp = tk.Entry(menu)
-        add_temp.grid(row=0, column=1)
+        add_temp.grid(row=0, column=1, padx=2, pady=1)
         bt_save = tk.Button(menu, text="Save", command=save)
-        bt_save.grid(row=0, column=2)
+        bt_save.grid(row=0, column=2, padx=2, pady=1)
 
         entries.clear()
 
@@ -39,14 +39,14 @@ def open_window(root):
                 time_entry = tk.Entry(
                     menu)
                 time_entry.insert(0, line["time"])
-                time_entry.grid(row=i, column=0)
+                time_entry.grid(row=i, column=0, padx=2, pady=1)
                 temp_entry = tk.Entry(menu)
                 temp_entry.insert(0, line["temp"])
-                temp_entry.grid(row=i, column=1)
+                temp_entry.grid(row=i, column=1, padx=2, pady=1)
                 entries.append([time_entry, temp_entry])
                 bt_del = tk.Button(menu, text="Delete",
                                    command=lambda idx=i-2: delete(idx))
-                bt_del.grid(row=i, column=2)
+                bt_del.grid(row=i, column=2, padx=2, pady=1)
 
     def delete(index):
         entries[index][0].destroy()

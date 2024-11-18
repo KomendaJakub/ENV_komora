@@ -156,25 +156,25 @@ frame_menu = tk.Frame(root)
 frame_menu.pack(side="top")
 
 frame_graph = tk.Frame(root)
-frame_graph.pack(side="bottom")
+frame_graph.pack(side=tk.BOTTOM, fill=tk.BOTH)
 
 status = tk.Label(root, text="", bd=1, relief=tk.SUNKEN,
                   anchor=tk.N, justify=tk.CENTER)
-status.pack(fill=tk.X, side=tk.TOP, ipady=2)
+status.pack(fill=tk.X, side=tk.TOP, pady=1)
 
 
 bt_refresh = tk.Button(frame_menu, text="Refresh", command=recalculate)
-bt_refresh.grid(row=0, column=0)
+bt_refresh.grid(row=0, column=0, padx=2, pady=1)
 
 # bt_start = tk.Button(frame_menu1, text="Start")
 # bt_start.grid(column=0, row=0, padx=1)
 bt_edit = tk.Button(frame_menu, text="Edit Profile",
                     command=lambda: open_window(root))
-bt_edit.grid(row=0, column=1)
+bt_edit.grid(row=0, column=1, padx=2, pady=1)
 bt_export = tk.Button(frame_menu, text="Export", command=export)
-bt_export.grid(row=0, column=2)
+bt_export.grid(row=0, column=2, padx=2, pady=1)
 canvas = FigureCanvasTkAgg(fig, master=frame_graph)
-canvas.get_tk_widget().pack(fill=tk.BOTH)
+canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
 toolbar = NavigationToolbar2Tk(canvas, frame_graph, pack_toolbar=False)
 toolbar.update()
