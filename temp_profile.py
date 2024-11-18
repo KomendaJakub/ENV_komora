@@ -13,10 +13,16 @@ entries = []
 
 def open_window(root):
 
+    default_bg = root.cget('bg')
+
+    def clear_status():
+        status.config(text="", bg=default_bg)
+
     def refresh():
         global add_time, add_temp
 
-        menu.pack_forget()
+        for widget in menu.winfo_children():
+            widget.destroy()
 
         l1 = tk.Label(menu, text="Time (HH:MM)")
         l1.grid(row=1, column=0, padx=1, pady=1)
@@ -29,6 +35,8 @@ def open_window(root):
         add_temp.grid(row=0, column=1, padx=2, pady=1)
         bt_save = tk.Button(menu, text="Save", command=save)
         bt_save.grid(row=0, column=2, padx=2, pady=1)
+        bt_save_as = tk.Button(menu, text="Save as", command=save_as)
+        bt_save_as.grid(row=0, column=3, padx=2, pady=1)
 
         entries.clear()
 
@@ -54,7 +62,7 @@ def open_window(root):
         entries.pop(index)
         save()
 
-    def save():
+    def save(path=FILE_PATH):
         global entries
         if add_time.get() and add_temp.get():
             entries.append([add_time, add_temp])
@@ -72,7 +80,7 @@ def open_window(root):
                 unique_times[time] = entry
         entries = list(unique_times.values())
 
-        with open(FILE_PATH, 'w') as file:
+        with open(path, 'w') as file:
             fieldnames = ['time', 'temp']
             writer = csv.DictWriter(file, fieldnames=fieldnames)
 
@@ -82,17 +90,30 @@ def open_window(root):
                 temp = entry[1].get()
                 writer.writerow({'time': time, 'temp': temp})
 
+        status.config(text="Changes have been saved!", bg="green")
+        root.after(10000, clear_status)
         refresh()
+
+    def save_as():
+        path = tk.filedialog.asksaveasfilename(initialdir=os.path.join(
+            DIR_PATH, "templates"), defaultextension=".csv")
+
+        if path is None or path.strip() == "":
+            return
+
+        save()
+        save(path)
 
     edit_window = tk.Toplevel(root)
     edit_window.title("Profile Editing")
     edit_window.geometry("800x480")
 
+    status = tk.Label(edit_window, text="", bd=1, relief=tk.SUNKEN,
+                      anchor=tk.N, justify=tk.CENTER)
+    status.pack(fill=tk.X, side=tk.TOP, pady=1)
+
     main_frame = tk.Frame(edit_window)
     main_frame.pack(fill="both", expand=1)
-
-#    status = tk.Label(root, text="", bd=1, relief=tk.SUNKEN, anchor=tk.W)
-#    status.pack(fill=tk.X, side=tk.TOP, ipady=2)
 
     canvas = tk.Canvas(main_frame)
     canvas.pack(side="left", fill="both", expand=1)

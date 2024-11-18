@@ -9,7 +9,7 @@ import sys
 import smtplib
 from email.message import EmailMessage
 import csv
-from confidential import EMAIL, PASSWORD, DESTINATION, MAIL_SERVER
+from confidential import EMAIL, PASSWORD, MAIL_SERVER
 
 if len(sys.argv) > 1 and sys.argv[1] == 'test':
     from sensor import get_measurement_test as get_measurement
@@ -40,7 +40,7 @@ def export():
     answer = tk.simpledialog.askstring(
         "Email", "Insert and email address to which data will be exported", parent=root)
 
-    if answer.strip() == '':
+    if answer is None or answer.strip() == '':
         status.config(text="No email address inserted!", bg="red")
         root.after(10000, clear_status)
         return
@@ -113,6 +113,9 @@ def recalculate():
     for i in range(len(xs)):
         delta_t = dt.datetime.strptime(xs[i], "%H:%M:%S")
         zs[i] = get_profile(delta_t)
+
+    status.config(text="Graph was refreshed!", bg="green")
+    root.after(10000, clear_status)
 
 
 def animate(i, xs, ys):
