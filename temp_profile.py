@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import csv
 import tkinter as tk
@@ -7,9 +7,32 @@ from shutil import copy
 
 DIR_PATH = os.path.dirname(__file__)
 FILE_PATH = os.path.join(DIR_PATH, 'profile.csv')
-
+TEMPLATES = os.path.join(DIR_PATH, 'templates')
 global entries, add_time, add_temp
 entries = []
+
+
+class TwoEntryDialog(tk.simpledialog.Dialog):
+
+    def __init__(self, parent, title=None, text1=None, text2=None):
+        self.text1 = text1
+        self.text2 = text2
+        super().__init__(parent, title=title)
+
+    def body(self, master):
+        tk.Label(master, text=self.text1).grid(row=0, column=0)
+        tk.Label(master, text=self.text2).grid(row=1, column=0)
+
+        self.e1 = tk.Entry(master)
+        self.e2 = tk.Entry(master)
+        self.e1.grid(row=0, column=1)
+        self.e2.grid(row=1, column=1)
+        return self.e1
+
+    def apply(self):
+        first = self.e1.get()
+        second = self.e2.get()
+        self.result = [first, second]
 
 
 def open_window(root):
@@ -30,16 +53,17 @@ def open_window(root):
         l2 = tk.Label(menu, text="Temperature (C)")
         l2.grid(row=1, column=1, padx=1, pady=1)
 
-        add_time = tk.Entry(menu)
-        add_time.grid(row=0, column=0, padx=2, pady=1)
-        add_temp = tk.Entry(menu)
-        add_temp.grid(row=0, column=1, padx=2, pady=1)
+        bt_add = tk.Button(menu, text="Add entry", command=add_entry)
+        bt_add.grid(row=0, column=0, padx=2, pady=1)
         bt_save = tk.Button(menu, text="Save", command=save)
-        bt_save.grid(row=0, column=2, padx=2, pady=1)
-        bt_save_as = tk.Button(menu, text="Save as", command=save_as)
-        bt_save_as.grid(row=0, column=3, padx=2, pady=1)
+        bt_save.grid(row=0, column=1, padx=2, pady=1)
+        bt_save_as = tk.Button(menu, text="Save profile as", command=save_as)
+        bt_save_as.grid(row=0, column=2, padx=2, pady=1)
         bt_load = tk.Button(menu, text="Load Profile", command=load_profile)
-        bt_load.grid(row=0, column=4, padx=2, pady=1)
+        bt_load.grid(row=0, column=3, padx=2, pady=1)
+        bt_cycles = tk.Button(menu, text="Create Cycles",
+                              command=create_cycles)
+        bt_cycles.grid(row=0, column=4, padx=2, pady=1)
 
         entries.clear()
 
@@ -59,19 +83,105 @@ def open_window(root):
                     bt_del = tk.Button(menu, text="Delete",
                                        command=lambda idx=i-2: delete(idx))
                     bt_del.grid(row=i, column=2, padx=2, pady=1)
-        except Exception:
-            msg = "There was an error while trying to load the profile"
+        except Exception as err:
+            msg = err
             print(msg)
-
             status.config(text=msg, bg="red")
             root.after(10000, clear_status)
             refresh()
             return
 
     def load_profile():
-        filename = tk.filedialog.askopenfilename(
-            initialdir=os.path.join(DIR_PATH, "templates"))
-        copy(filename, "profile.csv")
+        filename = tk.filedialog.askopenfilename(initialdir=TEMPLATES)
+        if filename is None or len(filename) == 0:
+            msg = f"File with {filename} does not exist"
+            print(msg)
+            status.config(text=msg, bg="red")
+            root.after(10000, clear_status)
+            return
+
+        copy(filename, FILE_PATH)
+        refresh()
+
+    def add_entry():
+        global entries
+
+        dialog = TwoEntryDialog(
+            edit_window, text1="Time (HH:MM)", text2="Temp (C)")
+        if dialog is None:
+            msg = "Nothing was entered"
+            print(msg)
+            status.config(text=msg, bg="red")
+            root.after(10000, clear_status)
+            return
+
+        time = dialog.result[0]
+        print(time)
+        temp = dialog.result[1]
+        add_time = tk.Entry(menu)
+        add_time.insert(0, time)
+        add_temp = tk.Entry(menu)
+        add_temp.insert(0, temp)
+        entries.append([add_time, add_temp])
+        save()
+
+    def create_cycles():
+        dialog = TwoEntryDialog(
+            edit_window, text1="Number of cycles: ", text2="Length of last entry (HH:MM): ")
+        if dialog is None:
+            msg = "Nothing was entered"
+            print(msg)
+            status.config(text=msg, bg="red")
+            root.after(10000, clear_status)
+            return
+
+        num_cycles = int(dialog.result[0])
+        len_last = dialog.result[1]
+        len_last = datetime.strptime(len_last, "%H:%M")
+        copy(FILE_PATH, os.path.join(TEMPLATES, "before_cycles.csv"))
+        contents = []
+        try:
+            with open(FILE_PATH) as file:
+                reader = csv.DictReader(file)
+                for line in reader:
+                    contents.append([line['time'], line['temp']])
+        except Exception as err:
+            msg = err
+            print(msg)
+            status.config(text=msg, bg="red")
+            root.after(10000, clear_status)
+
+        last_time = contents[-1][0]
+        last_time = datetime.strptime(last_time, "%H:%M")
+        next_time = timedelta(hours=last_time.hour, minutes=last_time.minute) + \
+            timedelta(hours=len_last.hour, minutes=len_last.minute)
+
+        try:
+            with open(FILE_PATH, 'w') as file:
+                fieldnames = ["time", "temp"]
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader()
+                for i in range(num_cycles):
+                    for value in contents:
+                        time = value[0]
+                        temp = value[1]
+                        time = datetime.strptime(time, "%H:%M")
+                        time = timedelta(hours=time.hour, minutes=time.minute)
+                        time = time + (i)*next_time
+                        if time.days > 0:
+                            break
+
+                        time_s = ":".join(
+                            [str(time.seconds // 3600), str((time.seconds % 3600) // 60)])
+                        writer.writerow({'time': time_s, 'temp': str(temp)})
+        except Exception as err:
+            msg = err, err.args
+            print(msg)
+            status.config(text=msg, bg="red")
+            root.after(10000, clear_status)
+            refresh()
+            return
+
         refresh()
 
     def delete(index):
@@ -82,8 +192,6 @@ def open_window(root):
 
     def save(path=FILE_PATH):
         global entries
-        if add_time.get() and add_temp.get():
-            entries.append([add_time, add_temp])
 
         def key(time):
             hour, minute = time.split(":")
@@ -99,17 +207,17 @@ def open_window(root):
         entries = list(unique_times.values())
 
         try:
+
             with open(path, 'w') as file:
                 fieldnames = ['time', 'temp']
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
-
                 writer.writeheader()
                 for entry in entries:
                     time = entry[0].get()
                     temp = entry[1].get()
                     writer.writerow({'time': time, 'temp': temp})
-        except Exception:
-            msg = "There was an error while saving to " + path
+        except Exception as err:
+            msg = err
             print(msg)
 
             status.config(text=msg, bg="red")
@@ -122,8 +230,8 @@ def open_window(root):
         refresh()
 
     def save_as():
-        path = tk.filedialog.asksaveasfilename(initialdir=os.path.join(
-            DIR_PATH, "templates"), defaultextension=".csv")
+        path = tk.filedialog.asksaveasfilename(
+            initialdir=TEMPLATES, defaultextension=".csv")
 
         if path is None or path.strip() == "":
             return
