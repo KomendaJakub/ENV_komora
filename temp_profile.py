@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import csv
 import tkinter as tk
+from shutil import copy
 
 DIR_PATH = os.path.dirname(__file__)
 FILE_PATH = os.path.join(DIR_PATH, 'profile.csv')
@@ -37,24 +38,41 @@ def open_window(root):
         bt_save.grid(row=0, column=2, padx=2, pady=1)
         bt_save_as = tk.Button(menu, text="Save as", command=save_as)
         bt_save_as.grid(row=0, column=3, padx=2, pady=1)
+        bt_load = tk.Button(menu, text="Load Profile", command=load_profile)
+        bt_load.grid(row=0, column=4, padx=2, pady=1)
 
         entries.clear()
 
-        with open(FILE_PATH) as file:
-            reader = csv.DictReader(file)
-            # Skip 2 rows because of labels
-            for i, line in enumerate(reader, start=2):
-                time_entry = tk.Entry(
-                    menu)
-                time_entry.insert(0, line["time"])
-                time_entry.grid(row=i, column=0, padx=2, pady=1)
-                temp_entry = tk.Entry(menu)
-                temp_entry.insert(0, line["temp"])
-                temp_entry.grid(row=i, column=1, padx=2, pady=1)
-                entries.append([time_entry, temp_entry])
-                bt_del = tk.Button(menu, text="Delete",
-                                   command=lambda idx=i-2: delete(idx))
-                bt_del.grid(row=i, column=2, padx=2, pady=1)
+        try:
+            with open(FILE_PATH) as file:
+                reader = csv.DictReader(file)
+                # Skip 2 rows because of labels
+                for i, line in enumerate(reader, start=2):
+                    time_entry = tk.Entry(
+                        menu)
+                    time_entry.insert(0, line["time"])
+                    time_entry.grid(row=i, column=0, padx=2, pady=1)
+                    temp_entry = tk.Entry(menu)
+                    temp_entry.insert(0, line["temp"])
+                    temp_entry.grid(row=i, column=1, padx=2, pady=1)
+                    entries.append([time_entry, temp_entry])
+                    bt_del = tk.Button(menu, text="Delete",
+                                       command=lambda idx=i-2: delete(idx))
+                    bt_del.grid(row=i, column=2, padx=2, pady=1)
+        except Exception:
+            msg = "There was an error while trying to load the profile"
+            print(msg)
+
+            status.config(text=msg, bg="red")
+            root.after(10000, clear_status)
+            refresh()
+            return
+
+    def load_profile():
+        filename = tk.filedialog.askopenfilename(
+            initialdir=os.path.join(DIR_PATH, "templates"))
+        copy(filename, "profile.csv")
+        refresh()
 
     def delete(index):
         entries[index][0].destroy()
@@ -80,15 +98,24 @@ def open_window(root):
                 unique_times[time] = entry
         entries = list(unique_times.values())
 
-        with open(path, 'w') as file:
-            fieldnames = ['time', 'temp']
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
+        try:
+            with open(path, 'w') as file:
+                fieldnames = ['time', 'temp']
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
 
-            writer.writeheader()
-            for entry in entries:
-                time = entry[0].get()
-                temp = entry[1].get()
-                writer.writerow({'time': time, 'temp': temp})
+                writer.writeheader()
+                for entry in entries:
+                    time = entry[0].get()
+                    temp = entry[1].get()
+                    writer.writerow({'time': time, 'temp': temp})
+        except Exception:
+            msg = "There was an error while saving to " + path
+            print(msg)
+
+            status.config(text=msg, bg="red")
+            root.after(10000, clear_status)
+            refresh()
+            return
 
         status.config(text="Changes have been saved!", bg="green")
         root.after(10000, clear_status)
@@ -137,18 +164,22 @@ def get_profile(time):
         return None
 
     last_temp = None
-    with open(FILE_PATH) as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            hour, minute = map(int, row['time'].split(":"))
-            prof_time = datetime(time.year, time.month,
-                                 time.day, hour, minute)
+    try:
+        with open(FILE_PATH) as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                hour, minute = map(int, row['time'].split(":"))
+                prof_time = datetime(time.year, time.month,
+                                     time.day, hour, minute)
 
-            if (prof_time > time):
-                return float(last_temp) if last_temp is not None else None
-            last_temp = float(row['temp'])
+                if (prof_time > time):
+                    return float(last_temp) if last_temp is not None else None
+                last_temp = float(row['temp'])
 
-        return last_temp
+            return last_temp
+    except Exception:
+        print("Unable to load the profile")
+        return None
 
 
 if __name__ == "__main__":

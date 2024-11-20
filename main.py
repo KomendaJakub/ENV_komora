@@ -48,8 +48,7 @@ def export():
         DESTINATION = answer
 
     try:
-        with open("Export.csv", "w"):
-            file = open("Export.csv", "w")
+        with open("Export.csv", "w") as file:
             fieldnames = ['time', "measurement", "set_temp"]
 
             writer = csv.DictWriter(file, fieldnames=fieldnames)
