@@ -116,7 +116,6 @@ def open_window(root):
             return
 
         time = dialog.result[0]
-        print(time)
         temp = dialog.result[1]
         add_time = tk.Entry(menu)
         add_time.insert(0, time)
@@ -199,12 +198,19 @@ def open_window(root):
 
         entries.sort(key=lambda x: key(x[0].get()))
 
-        unique_times = {}
-        for entry in entries:
-            time = entry[0].get()
-            if time not in unique_times:
-                unique_times[time] = entry
-        entries = list(unique_times.values())
+        index = 0
+        while index < len(entries) - 1:
+            dt1 = datetime.strptime(entries[index][0].get(), "%H:%M")
+            dt2 = datetime.strptime(entries[index+1][0].get(), "%H:%M")
+            while (dt1 == dt2):
+                entries[index+1][0].destroy()
+                entries[index+1][1].destroy()
+                entries.pop(index+1)
+                if index + 1 >= len(entries):
+                    break
+                else:
+                    dt2 = datetime.strptime(entries[index+1][0].get(), "%H:%M")
+            index += 1
 
         try:
 
