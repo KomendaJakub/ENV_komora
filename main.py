@@ -20,6 +20,7 @@ from temp_profile import get_profile, open_window
 
 
 def on_closing():
+    root.quit()
     root.destroy()
 
 
@@ -97,8 +98,9 @@ def export():
     except Exception as err:
         print(err)
         status.config(
-            text="There was an error while sending the email, try again or save manually!")
+            text="There was an error while sending the email, try again or save manually!", bg="red")
         root.after(30000, clear_status)
+        return
 
     status.config(text="Email sent successfully!", bg="green")
     root.after(10000, clear_status)
@@ -151,7 +153,7 @@ ani = animation.FuncAnimation(fig, animate, fargs=(xs, ys), interval=10000)
 # Initialize tkinter
 root = tk.Tk()
 # root.geometry("800x480")
-root.protocol("WM_DELETE_WINDOW", root.destroy)
+root.protocol("WM_DELETE_WINDOW", on_closing)
 
 default_bg = root.cget('bg')
 frame_menu = tk.Frame(root)

@@ -45,23 +45,31 @@ def open_window(root):
     def refresh():
         global add_time, add_temp
 
-        for widget in menu.winfo_children():
+        for widget in entries_frame.winfo_children():
             widget.destroy()
 
-        l1 = tk.Label(menu, text="Time (HH:MM)")
-        l1.grid(row=1, column=0, padx=1, pady=1)
-        l2 = tk.Label(menu, text="Temperature (C)")
-        l2.grid(row=1, column=1, padx=1, pady=1)
+        labels_frame = tk.Frame(menu_frame)
+        labels_frame.grid(row=2, pady=1, sticky="w")
 
-        bt_add = tk.Button(menu, text="Add entry", command=add_entry)
+        l1 = tk.Label(labels_frame, text="Time (HH:MM)")
+        l1.grid(row=0, column=0, padx=40, pady=1, sticky="w")
+        l2 = tk.Label(labels_frame, text="Temperature (C)")
+        l2.grid(row=0, column=1, padx=30, pady=1, sticky="w")
+
+        buttons_frame = tk.Frame(menu_frame)
+        buttons_frame.grid(row=1)
+
+        bt_add = tk.Button(buttons_frame, text="Add entry", command=add_entry)
         bt_add.grid(row=0, column=0, padx=2, pady=1)
-        bt_save = tk.Button(menu, text="Save", command=save)
+        bt_save = tk.Button(buttons_frame, text="Save", command=save)
         bt_save.grid(row=0, column=1, padx=2, pady=1)
-        bt_save_as = tk.Button(menu, text="Save profile as", command=save_as)
+        bt_save_as = tk.Button(
+            buttons_frame, text="Save profile as", command=save_as)
         bt_save_as.grid(row=0, column=2, padx=2, pady=1)
-        bt_load = tk.Button(menu, text="Load Profile", command=load_profile)
+        bt_load = tk.Button(buttons_frame, text="Load Profile",
+                            command=load_profile)
         bt_load.grid(row=0, column=3, padx=2, pady=1)
-        bt_cycles = tk.Button(menu, text="Create Cycles",
+        bt_cycles = tk.Button(buttons_frame, text="Create Cycles",
                               command=create_cycles)
         bt_cycles.grid(row=0, column=4, padx=2, pady=1)
 
@@ -72,15 +80,14 @@ def open_window(root):
                 reader = csv.DictReader(file)
                 # Skip 2 rows because of labels
                 for i, line in enumerate(reader, start=2):
-                    time_entry = tk.Entry(
-                        menu)
+                    time_entry = tk.Entry(entries_frame)
                     time_entry.insert(0, line["time"])
                     time_entry.grid(row=i, column=0, padx=2, pady=1)
-                    temp_entry = tk.Entry(menu)
+                    temp_entry = tk.Entry(entries_frame)
                     temp_entry.insert(0, line["temp"])
                     temp_entry.grid(row=i, column=1, padx=2, pady=1)
                     entries.append([time_entry, temp_entry])
-                    bt_del = tk.Button(menu, text="Delete",
+                    bt_del = tk.Button(entries_frame, text="Delete",
                                        command=lambda idx=i-2: delete(idx))
                     bt_del.grid(row=i, column=2, padx=2, pady=1)
         except Exception as err:
@@ -117,9 +124,9 @@ def open_window(root):
 
         time = dialog.result[0]
         temp = dialog.result[1]
-        add_time = tk.Entry(menu)
+        add_time = tk.Entry(entries_frame)
         add_time.insert(0, time)
-        add_temp = tk.Entry(menu)
+        add_temp = tk.Entry(entries_frame)
         add_temp.insert(0, temp)
         entries.append([add_time, add_temp])
         save()
@@ -127,7 +134,7 @@ def open_window(root):
     def create_cycles():
         dialog = TwoEntryDialog(
             edit_window, text1="Number of cycles: ", text2="Length of last entry (HH:MM): ")
-        if dialog is None:
+        if dialog is None or dialog.result is None:
             msg = "Nothing was entered"
             print(msg)
             status.config(text=msg, bg="red")
@@ -256,6 +263,9 @@ def open_window(root):
     main_frame = tk.Frame(edit_window)
     main_frame.pack(fill="both", expand=1)
 
+    menu_frame = tk.Frame(main_frame)
+    menu_frame.pack(side="top", fill="x")
+
     canvas = tk.Canvas(main_frame)
     canvas.pack(side="left", fill="both", expand=1)
 
@@ -265,9 +275,9 @@ def open_window(root):
 
     canvas.configure(yscrollcommand=scrollbar.set)
 
-    menu = tk.Frame(canvas)
-    canvas.create_window((0, 0), window=menu, anchor="n")
-    menu.bind('<Configure>', lambda e: canvas.configure(
+    entries_frame = tk.Frame(canvas)
+    canvas.create_window((0, 0), window=entries_frame, anchor="n")
+    entries_frame.bind('<Configure>', lambda e: canvas.configure(
         scrollregion=canvas.bbox("all")))
 
     refresh()
