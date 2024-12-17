@@ -89,7 +89,7 @@ def export():
 
 
 def clear_status():
-    status.config(text="", bg=default_bg)
+    status.config(text="", bg="#d9d9d9")
 
 
 # Create figure for plotting
@@ -145,6 +145,7 @@ ani = animation.FuncAnimation(fig, animate, fargs=(xs, ys), interval=10000)
 
 # Initialize tkinter
 root = tk.Tk()
+root.configure(background="seashell2")
 
 
 def on_closing():
@@ -154,17 +155,17 @@ def on_closing():
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
-default_bg = root.cget('bg')
-frame_menu = tk.Frame(root)
-frame_menu.pack(side="top")
-
-frame_graph = tk.Frame(root)
-frame_graph.pack(side=tk.BOTTOM, fill=tk.BOTH)
-
 status = tk.Label(root, text="", bd=1, relief=tk.SUNKEN,
                   anchor=tk.N, justify=tk.CENTER)
 status.pack(fill=tk.X, side=tk.TOP, pady=1)
 
+
+default_bg = root.cget('bg')
+frame_menu = tk.Frame(root, bg=default_bg)
+frame_menu.pack(side="top")
+
+frame_graph = tk.Frame(root)
+frame_graph.pack(side=tk.BOTTOM, fill=tk.BOTH)
 
 bt_refresh = tk.Button(frame_menu, text="Refresh", command=recalculate)
 bt_refresh.grid(row=0, column=0, padx=2, pady=1)
@@ -179,7 +180,8 @@ bt_export.grid(row=0, column=2, padx=2, pady=1)
 canvas = FigureCanvasTkAgg(fig, master=frame_graph)
 canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-toolbar = NavigationToolbar2Tk(canvas, frame_graph, pack_toolbar=False)
+toolbar = NavigationToolbar2Tk(
+    canvas, frame_graph, pack_toolbar=False)
 toolbar.update()
 toolbar.pack(side="bottom")
 

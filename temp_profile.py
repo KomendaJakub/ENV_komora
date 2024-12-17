@@ -40,7 +40,7 @@ def open_window(root):
     default_bg = root.cget('bg')
 
     def clear_status():
-        status.config(text="", bg=default_bg)
+        status.config(text="", bg="#d9d9d9")
 
     def refresh():
         global add_time, add_temp
@@ -48,15 +48,15 @@ def open_window(root):
         for widget in entries_frame.winfo_children():
             widget.destroy()
 
-        labels_frame = tk.Frame(menu_frame)
+        labels_frame = tk.Frame(menu_frame, bg=default_bg)
         labels_frame.grid(row=2, pady=1, sticky="w")
 
-        l1 = tk.Label(labels_frame, text="Time (HH:MM)")
+        l1 = tk.Label(labels_frame, text="Time (HH:MM)", bg=default_bg)
         l1.grid(row=0, column=0, padx=40, pady=1, sticky="w")
-        l2 = tk.Label(labels_frame, text="Temperature (C)")
+        l2 = tk.Label(labels_frame, text="Temperature (C)", bg=default_bg)
         l2.grid(row=0, column=1, padx=30, pady=1, sticky="w")
 
-        buttons_frame = tk.Frame(menu_frame)
+        buttons_frame = tk.Frame(menu_frame, bg=default_bg)
         buttons_frame.grid(row=1)
 
         bt_add = tk.Button(buttons_frame, text="Add entry", command=add_entry)
@@ -87,8 +87,8 @@ def open_window(root):
                     temp_entry.insert(0, line["temp"])
                     temp_entry.grid(row=i, column=1, padx=2, pady=1)
                     entries.append([time_entry, temp_entry])
-                    bt_del = tk.Button(entries_frame, text="Delete",
-                                       command=lambda idx=i-2: delete(idx))
+                    bt_del = tk.Button(
+                        entries_frame, text="Delete", activebackground="firebrick1", command=lambda idx=i-2: delete(idx))
                     bt_del.grid(row=i, column=2, padx=2, pady=1)
         except Exception as err:
             msg = err
@@ -261,7 +261,7 @@ def open_window(root):
 
         canvas.yview_scroll(direction, "units")
 
-    edit_window = tk.Toplevel(root)
+    edit_window = tk.Toplevel(root, bg=default_bg)
     edit_window.title("Profile Editing")
     edit_window.geometry("800x480")
 
@@ -272,7 +272,7 @@ def open_window(root):
     main_frame = tk.Frame(edit_window)
     main_frame.pack(fill="both", expand=1)
 
-    menu_frame = tk.Frame(main_frame)
+    menu_frame = tk.Frame(main_frame, bg=default_bg)
     menu_frame.pack(side="top", fill="x")
 
     canvas = tk.Canvas(main_frame)
