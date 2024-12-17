@@ -11,30 +11,12 @@ from email.message import EmailMessage
 import csv
 from confidential import EMAIL, PASSWORD, MAIL_SERVER
 
-if len(sys.argv) > 1 and sys.argv[1] == 'test':
+if len(sys.argv) > 1 and sys.argv[1] == 'debug':
     from sensor import get_measurement_test as get_measurement
 else:
     from sensor import get_measurement
 
 from temp_profile import get_profile, open_window
-
-
-def on_closing():
-    root.quit()
-    root.destroy()
-
-
-# Create figure for plotting
-
-fig = plt.figure()
-ax = fig.add_subplot(1, 1, 1)
-
-xs = []
-ys = []
-zs = []
-start_t = dt.datetime.now()
-
-# This function is called periodically from FuncAnimation
 
 
 def export():
@@ -110,6 +92,16 @@ def clear_status():
     status.config(text="", bg=default_bg)
 
 
+# Create figure for plotting
+fig = plt.figure()
+ax = fig.add_subplot(1, 1, 1)
+
+xs = []
+ys = []
+zs = []
+start_t = dt.datetime.now()
+
+
 def recalculate():
     for i in range(len(xs)):
         delta_t = dt.datetime.strptime(xs[i], "%H:%M:%S")
@@ -119,6 +111,7 @@ def recalculate():
     root.after(10000, clear_status)
 
 
+# This function is called periodically from FuncAnimation
 def animate(i, xs, ys):
 
     # Read temperature (Celsius) from TMP102
@@ -152,7 +145,13 @@ ani = animation.FuncAnimation(fig, animate, fargs=(xs, ys), interval=10000)
 
 # Initialize tkinter
 root = tk.Tk()
-# root.geometry("800x480")
+
+
+def on_closing():
+    root.quit()
+    root.destroy()
+
+
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
 default_bg = root.cget('bg')

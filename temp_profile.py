@@ -100,6 +100,7 @@ def open_window(root):
 
     def load_profile():
         filename = tk.filedialog.askopenfilename(initialdir=TEMPLATES)
+
         if filename is None or len(filename) == 0:
             msg = f"File with {filename} does not exist"
             print(msg)
@@ -252,6 +253,14 @@ def open_window(root):
         save()
         save(path)
 
+    def on_mousewheel(event):
+        if event.num == 4:
+            direction = -1
+        elif event.num == 5:
+            direction = 1
+
+        canvas.yview_scroll(direction, "units")
+
     edit_window = tk.Toplevel(root)
     edit_window.title("Profile Editing")
     edit_window.geometry("800x480")
@@ -279,6 +288,8 @@ def open_window(root):
     canvas.create_window((0, 0), window=entries_frame, anchor="n")
     entries_frame.bind('<Configure>', lambda e: canvas.configure(
         scrollregion=canvas.bbox("all")))
+    root.bind_all("<Button-4>", on_mousewheel)
+    root.bind_all("<Button-5>", on_mousewheel)
 
     refresh()
 
