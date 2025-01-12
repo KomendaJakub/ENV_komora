@@ -246,8 +246,8 @@ def open_window(root):
     def save_as():
         path = tk.filedialog.asksaveasfilename(
             initialdir=TEMPLATES, defaultextension=".csv")
-
-        if path is None or path.strip() == "":
+        print(path)
+        if path is None or path == () or path.strip() == "":
             return
 
         save()
@@ -261,9 +261,15 @@ def open_window(root):
 
         canvas.yview_scroll(direction, "units")
 
+    def on_closing_edit():
+        root.unbind_all("<Button-4>")
+        root.unbind_all("<Button-5>")
+        edit_window.destroy()
+
     edit_window = tk.Toplevel(root, bg=default_bg)
     edit_window.title("Profile Editing")
     edit_window.geometry("800x480")
+    edit_window.protocol("WM_DELETE_WINDOW", on_closing_edit)
 
     status = tk.Label(edit_window, text="", bd=1, relief=tk.SUNKEN,
                       anchor=tk.N, justify=tk.CENTER)
