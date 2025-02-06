@@ -22,6 +22,6 @@ def get_measurement():
     return cTemp
 
 
-def get_measurement_test():
+def get_measurement_debug():
     import random
     return random.randint(0, 100)

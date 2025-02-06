@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+
+# Importing standard libraries
 import datetime as dt
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -9,14 +11,16 @@ import sys
 import smtplib
 from email.message import EmailMessage
 import csv
+
+# Importing project code
 from confidential import EMAIL, PASSWORD, MAIL_SERVER
+from temp_profile import get_profile, open_edit
+from settings import open_settings
 
 if len(sys.argv) > 1 and sys.argv[1] == 'debug':
-    from sensor import get_measurement_test as get_measurement
+    from sensor import get_measurement_debug as get_measurement
 else:
     from sensor import get_measurement
-
-from temp_profile import get_profile, open_window
 
 
 def export():
@@ -170,13 +174,16 @@ frame_graph.pack(side=tk.BOTTOM, fill=tk.BOTH)
 bt_refresh = tk.Button(frame_menu, text="Refresh", command=recalculate)
 bt_refresh.grid(row=0, column=0, padx=2, pady=1)
 
-# bt_start = tk.Button(frame_menu1, text="Start")
-# bt_start.grid(column=0, row=0, padx=1)
 bt_edit = tk.Button(frame_menu, text="Edit Profile",
-                    command=lambda: open_window(root))
+                    command=lambda: open_edit(root))
 bt_edit.grid(row=0, column=1, padx=2, pady=1)
 bt_export = tk.Button(frame_menu, text="Export", command=export)
 bt_export.grid(row=0, column=2, padx=2, pady=1)
+
+bt_settings = tk.Button(frame_menu, text="Settings",
+                        command=lambda: open_settings(root))
+bt_settings.grid(row=0, column=3, padx=2, pady=1)
+
 canvas = FigureCanvasTkAgg(fig, master=frame_graph)
 canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 

@@ -35,7 +35,7 @@ class TwoEntryDialog(tk.simpledialog.Dialog):
         self.result = [first, second]
 
 
-def open_window(root):
+def open_edit(root):
 
     default_bg = root.cget('bg')
 
@@ -208,8 +208,18 @@ def open_window(root):
 
         index = 0
         while index < len(entries) - 1:
-            dt1 = datetime.strptime(entries[index][0].get(), "%H:%M")
-            dt2 = datetime.strptime(entries[index+1][0].get(), "%H:%M")
+            try:
+                dt1 = datetime.strptime(entries[index][0].get(), "%H:%M")
+                dt2 = datetime.strptime(entries[index+1][0].get(), "%H:%M")
+            except Exception as err:
+                msg = err
+                print(err)
+
+                status.config(text=msg, bg="red")
+                root.after(10000, clear_status)
+                refresh()
+                return
+
             while (dt1 == dt2):
                 entries[index+1][0].destroy()
                 entries[index+1][1].destroy()
@@ -228,8 +238,13 @@ def open_window(root):
                 writer.writeheader()
                 for entry in entries:
                     time = entry[0].get()
+                    hour, minute = map(int, time.split(":"))
                     temp = entry[1].get()
-                    writer.writerow({'time': time, 'temp': temp})
+                    if hour < 24 and minute < 60:
+                        writer.writerow({'time': time, 'temp': temp})
+                    else:
+                        print(time)
+                        print("ERROR time out of bounds")
         except Exception as err:
             msg = err
             print(msg)
