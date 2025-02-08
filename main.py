@@ -18,6 +18,16 @@ else:
 
 from temp_profile import get_profile, open_window
 
+global delay
+global last_event_t
+global prev_event_t
+global prev_delay
+
+delay = dt.timedelta()
+last_event_t = dt.datetime
+prev_event_t = dt.datetime
+prev_delay = 0
+
 
 def export():
     answer = tk.simpledialog.askstring(
@@ -113,12 +123,12 @@ def recalculate():
 
 # This function is called periodically from FuncAnimation
 def animate(i, xs, ys):
-
+    global last_event_t
     # Read temperature (Celsius) from TMP102
     temp_c = round(get_measurement(), 2)
 
     # Add x and y to lists
-    delta_t = dt.datetime.now() - start_t
+    delta_t = (dt.datetime.now() - delay) - start_t
     delta_t = dt.datetime.strptime(str(delta_t), "%H:%M:%S.%f")
     xs.append(delta_t.strftime("%H:%M:%S"))
     # xs.append(dt.datetime.now().strftime("%H:%M:%S"))
@@ -137,11 +147,43 @@ def animate(i, xs, ys):
     plt.ylabel('Temperature (deg C)')
     plt.legend()
     canvas.draw()
+    last_event_t = dt.datetime.now()
 
 # Set up plot to call animate() function periodically
 
 
 ani = animation.FuncAnimation(fig, animate, fargs=(xs, ys), interval=10000)
+
+
+def pause_anim():
+    global delay
+    global prev_event_t
+    global last_event_t
+    global prev_delay
+
+    if pause_anim.paused:
+        if prev_event_t == last_event_t:
+            new_delay = dt.datetime.now() - last_event_t
+            delay += new_delay - prev_delay
+            prev_delay = new_delay
+
+        else:
+            new_delay = dt.datetime.now() - last_event_t
+            delay += dt.datetime.now() - last_event_t
+            prev_event_t = last_event_t
+            prev_delay = new_delay
+
+        ani.resume()
+        clear_status()
+
+    else:
+        ani.pause()
+        status.config(text="Paused!", bg="red")
+
+    pause_anim.paused = not pause_anim.paused
+
+
+pause_anim.paused = False
 
 # Initialize tkinter
 root = tk.Tk()
@@ -170,13 +212,18 @@ frame_graph.pack(side=tk.BOTTOM, fill=tk.BOTH)
 bt_refresh = tk.Button(frame_menu, text="Refresh", command=recalculate)
 bt_refresh.grid(row=0, column=0, padx=2, pady=1)
 
-# bt_start = tk.Button(frame_menu1, text="Start")
-# bt_start.grid(column=0, row=0, padx=1)
+
 bt_edit = tk.Button(frame_menu, text="Edit Profile",
                     command=lambda: open_window(root))
 bt_edit.grid(row=0, column=1, padx=2, pady=1)
+
 bt_export = tk.Button(frame_menu, text="Export", command=export)
 bt_export.grid(row=0, column=2, padx=2, pady=1)
+
+bt_start = tk.Button(frame_menu, text="Pause/Resume",
+                     command=pause_anim)
+bt_start.grid(row=0, column=3, padx=2, pady=1)
+
 canvas = FigureCanvasTkAgg(fig, master=frame_graph)
 canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
