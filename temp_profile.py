@@ -133,18 +133,22 @@ def open_window(root):
         save()
 
     def create_cycles():
-        dialog = TwoEntryDialog(
-            edit_window, text1="Number of cycles: ", text2="Length of last entry (HH:MM): ")
-        if dialog is None or dialog.result is None:
+        num_cycles = tk.simpledialog.askinteger(
+            edit_window, "Enter the number of cycles (>= 2)")
+        if num_cycles is None:
             msg = "Nothing was entered"
             print(msg)
             status.config(text=msg, bg="red")
             root.after(10000, clear_status)
             return
 
-        num_cycles = int(dialog.result[0])
-        len_last = dialog.result[1]
-        len_last = datetime.strptime(len_last, "%H:%M")
+        if num_cycles < 2:
+            msg = "Incorrect number of cycles specified: " + str(num_cycles)
+            print(msg)
+            status.config(text=msg, bg="red")
+            root.after(10000, clear_status)
+            return
+
         copy(FILE_PATH, os.path.join(TEMPLATES, "before_cycles.csv"))
         contents = []
         try:
@@ -158,10 +162,17 @@ def open_window(root):
             status.config(text=msg, bg="red")
             root.after(10000, clear_status)
 
+        if float(contents[0][1]) != float(contents[-1][1]):
+            msg = f"Different temperatures in first ({contents[0][1]}) and last ({
+                contents[-1][1]}) entries"
+            print(msg)
+            status.config(text=msg, bg="red")
+            root.after(10000, clear_status)
+            return
+
         last_time = contents[-1][0]
         last_time = datetime.strptime(last_time, "%H:%M")
-        next_time = timedelta(hours=last_time.hour, minutes=last_time.minute) + \
-            timedelta(hours=len_last.hour, minutes=len_last.minute)
+        next_time = timedelta(hours=last_time.hour, minutes=last_time.minute)
 
         try:
             with open(FILE_PATH, 'w') as file:
@@ -169,7 +180,8 @@ def open_window(root):
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
                 writer.writeheader()
                 for i in range(num_cycles):
-                    for value in contents:
+                    for j in range(len(contents) - 1):
+                        value = contents[j + 1]
                         time = value[0]
                         temp = value[1]
                         time = datetime.strptime(time, "%H:%M")
@@ -181,6 +193,7 @@ def open_window(root):
                         time_s = ":".join(
                             [str(time.seconds // 3600), str((time.seconds % 3600) // 60)])
                         writer.writerow({'time': time_s, 'temp': str(temp)})
+
         except Exception as err:
             msg = err, err.args
             print(msg)
