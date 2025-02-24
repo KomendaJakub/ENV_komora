@@ -113,15 +113,19 @@ start_t = dt.datetime.now()
 
 
 def recalculate():
-    for i in range(len(xs)):
-        delta_t = dt.datetime.strptime(xs[i], "%H:%M:%S")
-        zs[i] = get_profile(delta_t)
+    res = map(lambda x: get_profile(
+        dt.datetime.strptime(x, "%H:%M:%S")), xs)
+
+    zs.clear()
+    zs.extend(res)
 
     status.config(text="Graph was refreshed!", bg="green")
     root.after(10000, clear_status)
 
 
 # This function is called periodically from FuncAnimation
+
+
 def animate(i, xs, ys):
     global last_event_t
     # Read temperature (Celsius) from TMP102

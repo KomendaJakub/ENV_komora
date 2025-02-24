@@ -323,9 +323,9 @@ def get_profile(time):
         with open(FILE_PATH) as file:
             reader = csv.DictReader(file)
             for row in reader:
-                hour, minute = map(int, row['time'].split(":"))
-                prof_time = datetime(time.year, time.month,
-                                     time.day, hour, minute)
+                prof_time = datetime.strptime(row['time'], "%H:%M")
+                prof_time.replace(
+                    year=time.year, month=time.month, day=time.day)
 
                 if (prof_time > time):
                     return float(last_temp) if last_temp is not None else None
