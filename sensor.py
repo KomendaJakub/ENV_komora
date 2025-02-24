@@ -19,7 +19,7 @@ def get_measurement():
     data = bus.read_i2c_block_data(0x45, 0x00, 6)
     temp = data[0] * 256 + data[1]
     cTemp = -45 + (175 * temp / 65535.0)
-    return cTemp
+    return round(cTemp, 2)
 
 
 def get_measurement_test():

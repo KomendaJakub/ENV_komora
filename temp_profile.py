@@ -241,6 +241,8 @@ def open_window(root):
                 writer.writeheader()
                 for entry in entries:
                     time = entry[0].get()
+                    time = datetime.strptime(time, "%H:%M")
+                    time = datetime.strftime(time, "%H:%M")
                     temp = entry[1].get()
                     writer.writerow({'time': time, 'temp': temp})
         except Exception as err:
