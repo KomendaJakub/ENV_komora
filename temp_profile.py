@@ -185,13 +185,12 @@ def open_window(root):
                         time = value[0]
                         temp = value[1]
                         time = datetime.strptime(time, "%H:%M")
-                        time = timedelta(hours=time.hour, minutes=time.minute)
+                        # time = timedelta(hours=time.hour, minutes=time.minute)
                         time = time + (i)*next_time
-                        if time.days > 0:
+                        if time.day > 1:
                             break
 
-                        time_s = ":".join(
-                            [str(time.seconds // 3600), str((time.seconds % 3600) // 60)])
+                        time_s = datetime.strftime(time, "%H:%M")
                         writer.writerow({'time': time_s, 'temp': str(temp)})
 
         except Exception as err:
