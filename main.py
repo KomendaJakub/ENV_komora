@@ -6,10 +6,7 @@ import matplotlib.ticker as ticker
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import tkinter as tk
 import sys
-import smtplib
-from email.message import EmailMessage
 import csv
-from confidential import EMAIL, PASSWORD, MAIL_SERVER
 
 if len(sys.argv) > 1 and sys.argv[1] == 'debug':
     from sensor import get_measurement_test as get_measurement
@@ -17,7 +14,7 @@ else:
     from sensor import get_measurement
 
 from temp_profile import get_profile, open_window
-
+from mail import mail
 global delay
 global last_event_t
 global prev_event_t
@@ -37,64 +34,15 @@ def export():
         status.config(text="No email address inserted!", bg="red")
         root.after(10000, clear_status)
         return
+
+    plt.savefig('figure.png', dpi=1200)
+
+    err = mail(answer, xs, ys, zs)
+
+    if err == 0:
+        status.config(text="Email sent successfully!", bg="green")
     else:
-        DESTINATION = answer
-
-    try:
-        with open("Export.csv", "w") as file:
-            fieldnames = ['time', "measurement", "set_temp"]
-
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            for i in range(len(xs)):
-                writer.writerow(
-                    {'time': xs[i], 'measurement': ys[i], 'set_temp': zs[i]})
-    except Exception as err:
-        print(err)
-        status.config(text="Could not open Export.csv for writing", bg="red")
-        root.after(10000, clear_status())
-
-    now = dt.datetime.now()
-    msg = EmailMessage()
-    msg.set_content("Environmental chamber measurement from " +
-                    now.strftime("%d/%m/%Y, %H:%M"))
-    msg['Subject'] = "ENV chamber " + now.strftime("%d/%m/%Y, %H:%M")
-    msg['From'] = EMAIL
-    msg['To'] = DESTINATION
-
-    try:
-        with open('Export.csv', 'rb') as fb:
-            data = fb.read()
-        msg.add_attachment(data, maintype='text',
-                           subtype='csv', filename='Raw.csv')
-
-        plt.savefig('figure.png', dpi=1200)
-        with open('figure.png', 'rb') as fb:
-            image = fb.read()
-        msg.add_attachment(image, maintype='image',
-                           subtype='png', filename='Figure.png')
-
-        with open('profile.csv', 'rb') as fb:
-            prof = fb.read()
-        msg.add_attachment(prof, maintype="text",
-                           subtype="csv", filename="profile.csv")
-
-    except Exception as err:
-        print(err)
-        status.config(text="Could not open one of the export files", bg="red")
-        root.after(10000, clear_status)
-    try:
-        with smtplib.SMTP_SSL(MAIL_SERVER, 465) as smtp:
-            smtp.login(EMAIL, PASSWORD)
-            smtp.send_message(msg)
-    except Exception as err:
-        print(err)
-        status.config(
-            text="There was an error while sending the email, try again or save manually!", bg="red")
-        root.after(30000, clear_status)
-        return
-
-    status.config(text="Email sent successfully!", bg="green")
+        status.config(text="Error, please retry or save manually!")
     root.after(10000, clear_status)
 
 
