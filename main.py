@@ -6,15 +6,16 @@ import matplotlib.ticker as ticker
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import tkinter as tk
 import sys
-import csv
 
 if len(sys.argv) > 1 and sys.argv[1] == 'debug':
     from sensor import get_measurement_test as get_measurement
 else:
     from sensor import get_measurement
 
-from temp_profile import get_profile, open_window
+from temp_profile import open_window
 from mail import mail
+from graphing import recalculate, get_profile
+
 global delay
 global last_event_t
 global prev_event_t
@@ -37,7 +38,7 @@ def export():
 
     plt.savefig('figure.png', dpi=1200)
 
-    err = mail(answer, xs, ys, zs)
+    err = mail(answer, time_list, real_temp_list, temp_profile)
 
     if err == 0:
         status.config(text="Email sent successfully!", bg="green")
@@ -54,18 +55,14 @@ def clear_status():
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
 
-xs = []
-ys = []
-zs = []
+time_list = []
+real_temp_list = []
+temp_profile = []
 start_t = dt.datetime.now()
 
 
-def recalculate():
-    res = map(lambda x: get_profile(
-        dt.datetime.strptime(x, "%H:%M:%S")), xs)
-
-    zs.clear()
-    zs.extend(res)
+def get_new_profile():
+    recalculate(time_list, temp_profile)
 
     status.config(text="Graph was refreshed!", bg="green")
     root.after(10000, clear_status)
@@ -74,7 +71,7 @@ def recalculate():
 # This function is called periodically from FuncAnimation
 
 
-def animate(i, xs, ys):
+def animate(i, time_list, ys):
     global last_event_t
     # Read temperature (Celsius) from TMP102
     temp_c = round(get_measurement(), 2)
@@ -82,14 +79,14 @@ def animate(i, xs, ys):
     # Add x and y to lists
     delta_t = (dt.datetime.now() - delay) - start_t
     delta_t = dt.datetime.strptime(str(delta_t), "%H:%M:%S.%f")
-    xs.append(delta_t.strftime("%H:%M:%S"))
-    # xs.append(dt.datetime.now().strftime("%H:%M:%S"))
+    time_list.append(delta_t.strftime("%H:%M:%S"))
+    # time_list.append(dt.datetime.now().strftime("%H:%M:%S"))
     ys.append(temp_c)
-    zs.append(get_profile(delta_t))
+    temp_profile.append(get_profile(delta_t))
     # Draw x and y lists
     ax.clear()
-    ax.plot(xs, ys, label="Actual Value", color="blue")
-    ax.plot(xs, zs, label="Set Value", color="red")
+    ax.plot(time_list, ys, label="Actual Value", color="blue")
+    ax.plot(time_list, temp_profile, label="Set Value", color="red")
     # Format plot
     ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
     plt.xticks(rotation=45, ha='right')
@@ -104,7 +101,8 @@ def animate(i, xs, ys):
 # Set up plot to call animate() function periodically
 
 
-ani = animation.FuncAnimation(fig, animate, fargs=(xs, ys), interval=10000)
+ani = animation.FuncAnimation(
+    fig, animate, fargs=(time_list, real_temp_list), interval=10000)
 
 
 def pause_anim():
