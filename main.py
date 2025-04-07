@@ -6,6 +6,7 @@ import matplotlib.ticker as ticker
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import tkinter as tk
 import sys
+from time import sleep
 
 if len(sys.argv) > 1 and sys.argv[1] == 'debug':
     from sensor import get_measurement_test as get_measurement
@@ -35,10 +36,8 @@ def export():
         status.config(text="No email address inserted!", bg="red")
         root.after(10000, clear_status)
         return
-
     plt.savefig('figure.png', dpi=1200)
-
-    err = mail(answer, time_list, real_temp_list, temp_profile)
+    err = mail(time_list, real_temp_list, temp_profile, answer)
 
     if err == 0:
         status.config(text="Email sent successfully!", bg="green")
@@ -59,10 +58,11 @@ time_list = []
 real_temp_list = []
 temp_profile = []
 start_t = dt.datetime.now()
+day = 1
 
 
 def get_new_profile():
-    recalculate(time_list, temp_profile)
+    recalculate(time_list, temp_profile, day)
 
     status.config(text="Graph was refreshed!", bg="green")
     root.after(10000, clear_status)
@@ -73,16 +73,32 @@ def get_new_profile():
 
 def animate(i, time_list, ys):
     global last_event_t
+    global day
+    global plt
     # Read temperature (Celsius) from TMP102
     temp_c = round(get_measurement(), 2)
 
-    # Add x and y to lists
+    # Add new values to the list
     delta_t = (dt.datetime.now() - delay) - start_t
-    delta_t = dt.datetime.strptime(str(delta_t), "%H:%M:%S.%f")
-    time_list.append(delta_t.strftime("%H:%M:%S"))
-    # time_list.append(dt.datetime.now().strftime("%H:%M:%S"))
+
+    if delta_t > (day)*dt.timedelta(days=1):
+        day += 1
+        plt.savefig('figure.png', dpi=1200)
+        mail(time_list, real_temp_list, temp_profile)
+        time_list.clear()
+        real_temp_list.clear()
+        temp_profile.clear()
+
+#    print(delta_t)
+    temporary = dt.datetime.strptime(
+        str(delta_t - (day - 1)*dt.timedelta(days=1)), "%H:%M:%S.%f")
+#    print(delta_t)
+#    print(delta_t.strftime("%H:%M:%S"))
+#    time_list.append(delta_t.strftime("%H:%M:%S"))
+
+    time_list.append(temporary.strftime("%H:%M:%S"))
     ys.append(temp_c)
-    temp_profile.append(get_profile(delta_t))
+    temp_profile.append(get_profile(delta_t, day))
     # Draw x and y lists
     ax.clear()
     ax.plot(time_list, ys, label="Actual Value", color="blue")
@@ -138,6 +154,7 @@ pause_anim.paused = False
 # Initialize tkinter
 root = tk.Tk()
 root.configure(background="seashell2")
+root.title("Environmental Chamber Control")
 
 
 def on_closing():
@@ -157,9 +174,9 @@ frame_menu = tk.Frame(root, bg=default_bg)
 frame_menu.pack(side="top")
 
 frame_graph = tk.Frame(root)
-frame_graph.pack(side=tk.BOTTOM, fill=tk.BOTH)
+frame_graph.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
-bt_refresh = tk.Button(frame_menu, text="Refresh", command=recalculate)
+bt_refresh = tk.Button(frame_menu, text="Refresh", command=get_new_profile)
 bt_refresh.grid(row=0, column=0, padx=2, pady=1)
 
 

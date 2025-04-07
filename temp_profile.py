@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import os
 import csv
 import tkinter as tk
+import tkinter.simpledialog
 from shutil import copy
 
 DIR_PATH = os.path.dirname(__file__)
@@ -12,7 +13,7 @@ global entries, add_time, add_temp
 entries = []
 
 
-class TwoEntryDialog(tk.simpledialog.Dialog):
+class TwoEntryDialog(tkinter.simpledialog.Dialog):
 
     def __init__(self, parent, title=None, text1=None, text2=None):
         self.text1 = text1
@@ -51,7 +52,7 @@ def open_window(root):
         labels_frame = tk.Frame(menu_frame, bg=default_bg)
         labels_frame.grid(row=2, pady=1, sticky="w")
 
-        l1 = tk.Label(labels_frame, text="Time (HH:MM)", bg=default_bg)
+        l1 = tk.Label(labels_frame, text="Time (DD:HH:MM)", bg=default_bg)
         l1.grid(row=0, column=0, padx=40, pady=1, sticky="w")
         l2 = tk.Label(labels_frame, text="Temperature (C)", bg=default_bg)
         l2.grid(row=0, column=1, padx=30, pady=1, sticky="w")
@@ -115,7 +116,7 @@ def open_window(root):
         global entries
 
         dialog = TwoEntryDialog(
-            edit_window, text1="Time (HH:MM)", text2="Temp (C)")
+            edit_window, text1="Time (DD:HH:MM)", text2="Temp (C)")
         if dialog is None:
             msg = "Nothing was entered"
             print(msg)
@@ -170,27 +171,36 @@ def open_window(root):
             root.after(10000, clear_status)
             return
 
+        first_time = contents[0][0]
+        first_time = datetime.strptime(first_time, "%d:%H:%M")
         last_time = contents[-1][0]
-        last_time = datetime.strptime(last_time, "%H:%M")
-        next_time = timedelta(hours=last_time.hour, minutes=last_time.minute)
+        last_time = datetime.strptime(last_time, "%d:%H:%M")
+
+        next_time = last_time - first_time
 
         try:
             with open(FILE_PATH, 'w') as file:
                 fieldnames = ["time", "temp"]
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
                 writer.writeheader()
+                time, temp = contents[0]
+
+                time = datetime.strptime(time, "%d:%H:%M")
+
+                time_s = datetime.strftime(time, "%d:%H:%M")
+                writer.writerow({'time': time_s, 'temp': str(temp)})
+
                 for i in range(num_cycles):
                     for j in range(len(contents) - 1):
-                        value = contents[j + 1]
-                        time = value[0]
-                        temp = value[1]
-                        time = datetime.strptime(time, "%H:%M")
+                        time, temp = contents[j + 1]
+                        time = datetime.strptime(time, "%d:%H:%M")
                         # time = timedelta(hours=time.hour, minutes=time.minute)
                         time = time + (i)*next_time
-                        if time.day > 1:
+
+                        if time - first_time >= timedelta(days=31):
                             break
 
-                        time_s = datetime.strftime(time, "%H:%M")
+                        time_s = datetime.strftime(time, "%d:%H:%M")
                         writer.writerow({'time': time_s, 'temp': str(temp)})
 
         except Exception as err:
@@ -213,15 +223,15 @@ def open_window(root):
         global entries
 
         def key(time):
-            hour, minute = time.split(":")
-            return int(hour)*100 + int(minute)
+            day, hour, minute = time.split(":")
+            return int(day)*10000 + int(hour)*100 + int(minute)
 
         entries.sort(key=lambda x: key(x[0].get()))
 
         index = 0
         while index < len(entries) - 1:
-            dt1 = datetime.strptime(entries[index][0].get(), "%H:%M")
-            dt2 = datetime.strptime(entries[index+1][0].get(), "%H:%M")
+            dt1 = datetime.strptime(entries[index][0].get(), "%d:%H:%M")
+            dt2 = datetime.strptime(entries[index+1][0].get(), "%d:%H:%M")
             while (dt1 == dt2):
                 entries[index+1][0].destroy()
                 entries[index+1][1].destroy()
@@ -229,7 +239,8 @@ def open_window(root):
                 if index + 1 >= len(entries):
                     break
                 else:
-                    dt2 = datetime.strptime(entries[index+1][0].get(), "%H:%M")
+                    dt2 = datetime.strptime(
+                        entries[index+1][0].get(), "%d:%H:%M")
             index += 1
 
         try:
@@ -240,8 +251,8 @@ def open_window(root):
                 writer.writeheader()
                 for entry in entries:
                     time = entry[0].get()
-                    time = datetime.strptime(time, "%H:%M")
-                    time = datetime.strftime(time, "%H:%M")
+                    time = datetime.strptime(time, "%d:%H:%M")
+                    time = datetime.strftime(time, "%d:%H:%M")
                     temp = entry[1].get()
                     writer.writerow({'time': time, 'temp': temp})
         except Exception as err:

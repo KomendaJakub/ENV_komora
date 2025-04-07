@@ -5,7 +5,7 @@ from confidential import EMAIL, PASSWORD, MAIL_SERVER
 import smtplib
 
 
-def mail(address, xs, ys, zs):
+def mail(xs, ys, zs, address=EMAIL):
     try:
         with open("Export.csv", 'w') as file:
             fieldnames = ['time', 'measurement', 'set_temp']
