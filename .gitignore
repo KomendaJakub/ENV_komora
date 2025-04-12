@@ -1,3 +1,5 @@
 confidential.py
 __pycache__*
 saves*
+data/*
+resources/confidential*

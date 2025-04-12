@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+
+# Import standard python libraries
 from datetime import datetime, timedelta
 import os
 import csv
@@ -7,8 +9,8 @@ import tkinter.simpledialog
 from shutil import copy
 
 DIR_PATH = os.path.dirname(__file__)
-FILE_PATH = os.path.join(DIR_PATH, 'profile.csv')
-TEMPLATES = os.path.join(DIR_PATH, 'templates')
+FILE_PATH = os.path.join(DIR_PATH, 'resources/profile.csv')
+TEMPLATES = os.path.join(DIR_PATH, 'resources.templates')
 global entries, add_time, add_temp
 entries = []
 

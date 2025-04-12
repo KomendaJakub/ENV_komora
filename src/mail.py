@@ -1,25 +1,34 @@
+# Importing standard python libraries
 from csv import DictWriter
 from datetime import datetime
 from email.message import EmailMessage
-from confidential import EMAIL, PASSWORD, MAIL_SERVER
 import smtplib
 
+# Importing config options
+# TODO: Rewrite using json config file
+from src.confidential import EMAIL, PASSWORD, MAIL_SERVER
 
-def mail(xs, ys, zs, address=EMAIL):
+
+def mail(session, address=EMAIL):
+    # TODO: Rewrite mail to return something that can be assesed as success or failure
+    # Write data that will be later attached to the email
     try:
-        with open("Export.csv", 'w') as file:
+        with open("data/export/data.csv", 'w') as file:
+            # TODO: Change these fieldnames
             fieldnames = ['time', 'measurement', 'set_temp']
 
             writer = DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
-            for i in range(len(xs)):
+            for time, real, target in zip(session.times, session.real_temps, session.target_temps):
                 writer.writerow(
-                    {'time': xs[i], 'measurement': ys[i], 'set_temp': zs[i]})
+                    {'time': time, 'measurement': real, 'set_temp': target}
+                )
     except Exception as err:
         print(err)
 # "Could not open the Export.csv file."
         return err
 
+    # Create the email message
     now = datetime.now()
     msg = EmailMessage()
     msg.set_content("Environmental chamber measurement from " +
@@ -28,19 +37,19 @@ def mail(xs, ys, zs, address=EMAIL):
     msg['From'] = EMAIL
     msg['To'] = address
 
+    # Add attachments to the email
     try:
-        with open('Export.csv', 'rb') as fb:
+        with open('data/export/data.csv', 'rb') as fb:
             data = fb.read()
         msg.add_attachment(data, maintype='text',
-                           subtype='csv', filename='Raw.csv')
+                           subtype='csv', filename='data.csv')
 
-#        plt.savefig('figure.png', dpi=1200)
-        with open('figure.png', 'rb') as fb:
+        with open('data/export/figure.png', 'rb') as fb:
             image = fb.read()
         msg.add_attachment(image, maintype='image',
-                           subtype='png', filename='Figure.png')
+                           subtype='png', filename='figure.png')
 
-        with open('profile.csv', 'rb') as fb:
+        with open('resources/templates/profile.csv', 'rb') as fb:
             prof = fb.read()
         msg.add_attachment(prof, maintype="text",
                            subtype="csv", filename="profile.csv")
@@ -48,17 +57,14 @@ def mail(xs, ys, zs, address=EMAIL):
     except Exception as err:
         print(err)
         return err
+
+    # Connect to the mailing server and send the email
     try:
         with smtplib.SMTP_SSL(MAIL_SERVER, 465) as smtp:
             smtp.login(EMAIL, PASSWORD)
             smtp.send_message(msg)
     except Exception as err:
         print(err)
-#        status.config(
-#            text="There was an error while sending the email, try again or save manually!", bg="red")
-#        root.after(30000, clear_status)
         return err
 
-#    status.config(text="Email sent successfully!", bg="green")
-#    root.after(10000, clear_status)
     return 0

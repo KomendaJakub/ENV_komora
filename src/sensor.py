@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-
-# Imports
+# Imports from standard libraries
 import time
 
 # Function definitions()

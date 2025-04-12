@@ -2,8 +2,10 @@ import datetime as dt
 from csv import DictReader
 import os
 
-DIR_PATH = os.path.dirname(__file__)
-FILE_PATH = os.path.join(DIR_PATH, 'profile.csv')
+# DIR_PATH = os.path.dirname(__file__)
+# DIR_PATH = os.getcwd()
+# FILE_PATH = os.path.join(DIR_PATH, 'resources/profile.csv')
+FILE_PATH = 'resources/templates/profile.csv'
 
 
 def recalculate(time_list, set_temp_list, elapsed_days):
@@ -33,7 +35,6 @@ def get_profile(time, elapsed_days, file=FILE_PATH):
             prof_temp = row['temp']
 
             if (prof_time > time):
-                #                print("Time at output: " + str(prof_time))
                 if (last_time is None):
                     return float(prof_temp)
                 time_since_last = time - last_time
