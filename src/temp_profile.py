@@ -8,9 +8,12 @@ import tkinter as tk
 import tkinter.simpledialog
 from shutil import copy
 
-DIR_PATH = os.path.dirname(__file__)
-FILE_PATH = os.path.join(DIR_PATH, 'resources/profile.csv')
-TEMPLATES = os.path.join(DIR_PATH, 'resources.templates')
+# DIR_PATH = os.path.dirname(__file__)
+# FILE_PATH = os.path.join(DIR_PATH, 'resources/profile.csv')
+# TEMPLATES = os.path.join(DIR_PATH, 'resources/templates')
+FILE_PATH = "resources/profile.csv"
+TEMPLATES = "resources/templates"
+
 global entries, add_time, add_temp
 entries = []
 
@@ -285,7 +288,6 @@ def open_window(root):
             direction = -1
         elif event.num == 5:
             direction = 1
-
         canvas.yview_scroll(direction, "units")
 
     def on_closing_edit():

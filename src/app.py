@@ -17,7 +17,8 @@ if len(sys.argv) > 1 and sys.argv[1] == 'debug':
 else:
     from src.sensor import get_measurement
 
-from src.temp_profile import open_window
+from src.edit_window import Edit_Window
+# from src.temp_profile import open_window
 from src.mail import mail
 from src.graphing import recalculate
 
@@ -64,7 +65,7 @@ class App(tk.Tk):
                   command=self.get_new_profile).grid(row=0, column=0, padx=2, pady=1)
         # TODO: Change how opening of the edit_window is handled
         tk.Button(menu, text="Edit Profile",
-                  command=lambda: open_window(self)).grid(row=0, column=1, padx=2, pady=1)
+                  command=lambda: Edit_Window(self)).grid(row=0, column=1, padx=2, pady=1)
         tk.Button(menu, text="Export", command=self.export).grid(
             row=0, column=2, padx=2, pady=1)
         tk.Button(menu, text="Pause/Resume",
@@ -158,10 +159,10 @@ class App(tk.Tk):
         plt.savefig('data/export/figure.png', dpi=1200)
         # TODO: Change mail to accept a Session
         err = mail(self.controller.session, address=answer)
-        if err == 0:
+        if err == "ok":
             self.set_status("Email sent successfully!", "green")
         else:
-            self.set_status("Error, please retry or save manually!", "green")
+            self.set_status(err, "red")
 
 
 # TODO: Get this into the state class

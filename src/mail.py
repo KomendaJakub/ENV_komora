@@ -3,13 +3,19 @@ from csv import DictWriter
 from datetime import datetime
 from email.message import EmailMessage
 import smtplib
+import json
 
-# Importing config options
-# TODO: Rewrite using json config file
-from src.confidential import EMAIL, PASSWORD, MAIL_SERVER
+CONFIG_PATH = "resources/confidential.json"
 
 
-def mail(session, address=EMAIL):
+def mail(session, address=None):
+    # Load confidential data from config file
+    with open(CONFIG_PATH) as file:
+        config = json.load(file)
+
+    if address is None:
+        address = config['EMAIL']
+
     # TODO: Rewrite mail to return something that can be assesed as success or failure
     # Write data that will be later attached to the email
     try:
@@ -23,10 +29,8 @@ def mail(session, address=EMAIL):
                 writer.writerow(
                     {'time': time, 'measurement': real, 'set_temp': target}
                 )
-    except Exception as err:
-        print(err)
-# "Could not open the Export.csv file."
-        return err
+    except Exception:
+        return "Could not open export file. Please try to save manually."
 
     # Create the email message
     now = datetime.now()
@@ -34,7 +38,7 @@ def mail(session, address=EMAIL):
     msg.set_content("Environmental chamber measurement from " +
                     now.strftime("%d/%m/%Y, %H:%M"))
     msg['Subject'] = "ENV chamber " + now.strftime("%d/%m/%Y, %H:%M")
-    msg['From'] = EMAIL
+    msg['From'] = config['EMAIL']
     msg['To'] = address
 
     # Add attachments to the email
@@ -54,17 +58,15 @@ def mail(session, address=EMAIL):
         msg.add_attachment(prof, maintype="text",
                            subtype="csv", filename="profile.csv")
 
-    except Exception as err:
-        print(err)
-        return err
+    except Exception:
+        return "Could not add attachments. Please try to save manually."
 
     # Connect to the mailing server and send the email
     try:
-        with smtplib.SMTP_SSL(MAIL_SERVER, 465) as smtp:
-            smtp.login(EMAIL, PASSWORD)
+        with smtplib.SMTP_SSL(config['MAIL_SERVER'], 465) as smtp:
+            smtp.login(config['EMAIL'], config['PASSWORD'])
             smtp.send_message(msg)
-    except Exception as err:
-        print(err)
-        return err
+    except Exception:
+        return "Error while connecting to the mailing server. Please try to save manually."
 
-    return 0
+    return "ok"
