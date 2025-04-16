@@ -52,8 +52,6 @@ class Controller():
         new_delay = dt.datetime.now() - self.session.last_event_t
 
         if self.session.prev_event_t == self.session.last_event_t:
-            print(f"New delay {new_delay}")
-            print(f"prev_delay {self.session.prev_delay}")
             self.session.delay += new_delay - self.session.prev_delay
         else:
             self.session.delay += new_delay

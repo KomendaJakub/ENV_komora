@@ -35,12 +35,18 @@ class App(tk.Tk):
         self.configure(background="seashell2")
         self.title("Environmental Chamber Control")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        # TODO: Cannot resize window with mouse
+
+        # Set standard window size
+        self.geometry("854x480")
+        self.update()
+        self.geometry()
+        self.minsize(self.winfo_width(), self.winfo_height())
         self.resizable(True, True)
 
         # TODO: Add and iconphoto
         # self.iconphoto(True, tk.PhotoImage(file=path_to_logo))
 
+        self.default_bg = self.cget('bg')
         # Define a field to display status messages
         self.status = tk.Label(self, text="", bd=1, relief=tk.SUNKEN,
                                anchor=tk.N, justify=tk.CENTER)
@@ -49,21 +55,18 @@ class App(tk.Tk):
         self._build_menu()
         self._build_graph()
 
-        # Create an animation
-        # TODO: finish this up
         # Set up plot to call animate() function periodically
         self.ani = animation.FuncAnimation(
             self.fig, partial(self.animate), interval=self.REFRESH_INTERVAL_MS)
 
     def _build_menu(self):
         # Create a menu
-        menu = tk.Frame(self, bg="white")  # bg=default_bg)
+        menu = tk.Frame(self, bg=self.default_bg)
         menu.pack(side="top")
 
         # Define the buttons
         tk.Button(menu, text="Refresh",
                   command=self.get_new_profile).grid(row=0, column=0, padx=2, pady=1)
-        # TODO: Change how opening of the edit_window is handled
         tk.Button(menu, text="Edit Profile",
                   command=lambda: Edit_Window(self)).grid(row=0, column=1, padx=2, pady=1)
         tk.Button(menu, text="Export", command=self.export).grid(
@@ -142,10 +145,7 @@ class App(tk.Tk):
             self.status.configure(text="Paused!", bg="red")
 
     def get_new_profile(self):
-        # TODO: Change recalculate to accept a Session
-        recalculate(self.controller.session.times,
-                    self.controller.session.target_temps,
-                    self.controller.session.day)
+        recalculate(self.controller.session)
         self.set_status("Graph was refreshed!", "green")
 
     def export(self):
@@ -157,13 +157,8 @@ class App(tk.Tk):
             return
 
         plt.savefig('data/export/figure.png', dpi=1200)
-        # TODO: Change mail to accept a Session
         err = mail(self.controller.session, address=answer)
         if err == "ok":
             self.set_status("Email sent successfully!", "green")
         else:
             self.set_status(err, "red")
-
-
-# TODO: Get this into the state class
-# default_bg = root.cget('bg')

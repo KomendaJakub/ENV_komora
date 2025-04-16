@@ -6,8 +6,8 @@ from shutil import copy
 # Importing source code
 from src.edit_controller import load_profile, save_profile, create_cycles
 
-FILE_PATH = '/resources/templates/profile.csv'
-TEMPLATES = '/resources/templates'
+FILE_PATH = 'resources/templates/profile.csv'
+TEMPLATES = 'resources/templates'
 
 
 class TwoEntryDialog(tkinter.simpledialog.Dialog):
@@ -42,8 +42,14 @@ class Edit_Window(tk.Toplevel):
         self.default_bg = self.root.cget('bg')
         super().__init__(self.root, bg=self.default_bg)
 
-        self.title("HELLO!")
-        self.geometry("800x400")
+        # Set standard window size
+        self.geometry("854x480")
+        self.update()
+        self.geometry()
+        self.minsize(self.winfo_width(), self.winfo_height())
+        self.resizable(True, True)
+
+        self.title("Edit profile")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         self.status = tk.Label(self, text="", bd=1, relief=tk.SUNKEN,
@@ -51,15 +57,14 @@ class Edit_Window(tk.Toplevel):
         self.status.pack(fill=tk.X, side=tk.TOP, pady=1)
 
         main_frame = tk.Frame(self)
-        main_frame.pack(side="top", fill="x")
+        main_frame.pack(side="top", fill="both", expand=True)
 
         self.menu = tk.Frame(main_frame, bg=self.default_bg)
         self.menu.pack(side="top", fill="x")
-
         self._build_menu()
 
         self.canvas = tk.Canvas(main_frame)
-        self.canvas.pack(side="left", fill="both", expand=1)
+        self.canvas.pack(side="left", fill="both", expand=True)
 
         scrollbar = tk.Scrollbar(
             main_frame, orient="vertical", command=self.canvas.yview)
@@ -68,14 +73,14 @@ class Edit_Window(tk.Toplevel):
         self.canvas.configure(yscrollcommand=scrollbar.set)
 
         self.entries_frame = tk.Frame(self.canvas)
+        self.entries_frame.pack(anchor=tk.CENTER)
         self.canvas.create_window(
             (0, 0), window=self.entries_frame, anchor="n")
         self.entries_frame.bind('<Configure>', lambda e: self.canvas.configure(
             scrollregion=self.canvas.bbox("all")))
 
-        # TODO: Is root really necessary here?
-        self.root.bind_all("<Button-4>", self.on_mousewheel)
-        self.root.bind_all("<Button-5>", self.on_mousewheel)
+        self.bind_all("<Button-4>", self.on_mousewheel)
+        self.bind_all("<Button-5>", self.on_mousewheel)
 
         self.entries = []
         self.refresh()
@@ -95,12 +100,16 @@ class Edit_Window(tk.Toplevel):
         tk.Button(buttons_frame, text="Create Cycles", command=self.generate_cycles).grid(
             row=0, column=4, padx=2, pady=1)
 
+        labels_frame = tk.Frame(self.menu, bg=self.default_bg)
+        labels_frame.grid(row=2, pady=1, sticky="w")
+        l1 = tk.Label(labels_frame, text="Time (DD:HH:MM)", bg=self.default_bg)
+        l1.grid(row=0, column=0, padx=40, pady=1, sticky="w")
+        l2 = tk.Label(labels_frame, text="Temperature (C)", bg=self.default_bg)
+        l2.grid(row=0, column=1, padx=30, pady=1, sticky="w")
+
     def on_closing(self):
-        # TODO: Is root really necessary here?
-        self.root.unbind_all("<Button-4>")
-        self.root.unbind_all("<Button-5>")
-        # Inserted self.quit() not so sure about it we will see
-        self.quit()
+        self.unbind_all("<Button-4>")
+        self.unbind_all("<Button-5>")
         self.destroy()
 
     def on_mousewheel(self, event):
@@ -113,11 +122,10 @@ class Edit_Window(tk.Toplevel):
 
     def set_status(self, message, color):
         self.status.config(text=message, bg=color)
-        # TODO: Is root really necessary here?
-        self.root.after(self.REFRESH_INTERVAL_MS, self.clear_status)
+        self.after(self.REFRESH_INTERVAL_MS, self.clear_status)
 
     def clear_status(self):
-        self.status.config(text="", bg="d9d9d9")
+        self.status.config(text="", bg="#d9d9d9")
 
     def refresh(self):
         for widget in self.entries_frame.winfo_children():
@@ -131,8 +139,7 @@ class Edit_Window(tk.Toplevel):
             self.set_status("Could not load profile", "red")
             return
 
-        # TODO: Is this start really necessary? If so why?
-        for i, (time, temp) in enumerate(data, start=2):
+        for i, (time, temp) in enumerate(data):
             time_entry = tk.Entry(self.entries_frame)
             time_entry.insert(0, time)
             time_entry.grid(row=i, column=0, padx=2, pady=1)
@@ -142,7 +149,7 @@ class Edit_Window(tk.Toplevel):
             temp_entry.grid(row=i, column=1, padx=2, pady=1)
 
             bt_del = tk.Button(self.entries_frame, text="Delete", activebackground="firebrick1",
-                               command=lambda idx=i-2: self.delete(idx))
+                               command=lambda idx=i: self.delete(idx))
             bt_del.grid(row=i, column=2, padx=2, pady=1)
 
             self.entries.append([time_entry, temp_entry])
@@ -150,8 +157,7 @@ class Edit_Window(tk.Toplevel):
     def add_entry(self):
         dialog = TwoEntryDialog(
             self, text1="Time (DD:HH:MM)", text2="Temp (C)")
-        # TODO: Replace this with if not dialog.result?
-        if dialog is None:
+        if not dialog.result:
             self.set_status("Nothing was entered", "red")
             return
         time = dialog.result[0]
@@ -171,6 +177,7 @@ class Edit_Window(tk.Toplevel):
         except Exception:
             self.set_status("Error while trying to save profile!", "red")
         self.refresh()
+        self.root.get_new_profile()
 
     def save_as(self):
         path = tk.filedialog.asksaveasfilename(
@@ -211,5 +218,6 @@ class Edit_Window(tk.Toplevel):
             self.set_status(msg, "red")
             return
 
-        create_cycles(num_cycles)
+        create_cycles(num_cycles, FILE_PATH)
         self.refresh()
+        self.root.get_new_profile()

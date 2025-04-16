@@ -8,12 +8,13 @@ from csv import DictReader
 FILE_PATH = 'resources/templates/profile.csv'
 
 
-def recalculate(time_list, set_temp_list, elapsed_days):
-    temp = map(lambda time: dt.datetime.strptime(time, "%H:%M:%S"), time_list)
+def recalculate(session):
+    temp = map(lambda time: dt.datetime.strptime(
+        time, "%H:%M:%S"), session.times)
     res = map(lambda time: get_profile(
-        dt.timedelta(days=elapsed_days - 1, hours=time.hour, minutes=time.minute, seconds=time.second), elapsed_days), temp)
-    set_temp_list.clear()
-    set_temp_list.extend(res)
+        dt.timedelta(days=session.day - 1, hours=time.hour, minutes=time.minute, seconds=time.second), session.day), temp)
+    session.target_temps.clear()
+    session.target_temps.extend(res)
     return
 
 
