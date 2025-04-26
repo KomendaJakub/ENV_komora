@@ -1,6 +1,7 @@
 import datetime as dt
 import dataclasses
 from src.graphing import get_profile
+from src.export import autosave
 
 
 @dataclasses.dataclass
@@ -15,7 +16,9 @@ class Session():
     target_temps: list[float] = dataclasses.field(default_factory=list)
     start_t: dt.datetime = dataclasses.field(default_factory=dt.datetime.now)
     day: int = 1
+    hour: int = 0
     paused: bool = False
+    measurement_name: str = None
 
 
 class Controller():
@@ -23,14 +26,22 @@ class Controller():
 
     def __init__(self):
         self.session = Session()
+        self.session.measurement_name = dt.datetime.strftime(
+            dt.datetime.now(), "%Y_%m_%d")
 
     def add_data_point(self, measurement: float) -> str:
 
         # Add new values to the list
         delta_t = (dt.datetime.now() - self.session.delay) - \
-            self.session.start_t
+            self.session.start_t + dt.timedelta(minutes=59, seconds=45)
+
+        if delta_t > (self.session.hour)*dt.timedelta(hours=1):
+            self.session.hour += 1
+            autosave(self.session)
+
         if delta_t > (self.session.day)*dt.timedelta(days=1):
             self.session.day += 1
+            autosave(self.session)
             return 'day_change'
 
         temporary = dt.datetime.strptime(

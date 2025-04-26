@@ -4,6 +4,7 @@ from datetime import datetime
 from email.message import EmailMessage
 import smtplib
 import json
+import os
 
 CONFIG_PATH = "resources/confidential.json"
 
@@ -31,6 +32,7 @@ def mail(session, address=None):
                 )
     except Exception:
         return "Could not open export file. Please try to save manually."
+    # TODO: Clean up/Remove files that you created for export
 
     # Create the email message
     now = datetime.now()
@@ -68,5 +70,11 @@ def mail(session, address=None):
             smtp.send_message(msg)
     except Exception:
         return "Error while connecting to the mailing server. Please try to save manually."
+
+    # Clean up
+    for root, dirs, files in os.walk("data/export"):
+        for file in files:
+            path = os.path.join(root, file)
+            os.remove(path)
 
     return "ok"
