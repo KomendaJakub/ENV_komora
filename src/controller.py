@@ -19,6 +19,7 @@ class Session():
     hour: int = 0
     paused: bool = False
     measurement_name: str = None
+    profile_name: str = None
 
 
 class Controller():
@@ -26,8 +27,7 @@ class Controller():
 
     def __init__(self):
         self.session = Session()
-        self.session.measurement_name = dt.datetime.strftime(
-            dt.datetime.now(), "%Y_%m_%d")
+        self.session.measurement_name = "Untitled"
 
     def add_data_point(self, measurement: float) -> str:
 
