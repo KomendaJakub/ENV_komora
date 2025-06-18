@@ -1,21 +1,21 @@
 from datetime import datetime, timedelta
 import csv
-import os.path
-from shutil import copy
+import pathlib
+import shutil
 
-TEMPLATES = 'resources/templates/'
+TEMPLATES = pathlib.Path("resources/templates/")
 DT_FORMAT = "%d:%H:%M"
 
 
-def load_profile(path):
+def load_profile(path: pathlib.Path):
     # Loads the current profile as specified in the file
     # resources/templates/profile.csv
 
     data = []
-    with open(path, 'r') as file:
+    with path.open() as file:
         reader = csv.DictReader(file)
         for line in reader:
-            data.append((line['time'], line['temp']))
+            data.append((line["time"], line["temp"]))
 
     return data
 
@@ -25,7 +25,7 @@ def key(time):
     return int(day)*10000 + int(hour)*100 + int(minute)
 
 
-def save_profile(data, path):
+def save_profile(data, path: pathlib.Path):
     # Take data and write it into a file specified by path
     data.sort(key=lambda x: key(x[0]))
 
@@ -42,8 +42,8 @@ def save_profile(data, path):
                 dt2 = datetime.strptime(data[index+1][0], DT_FORMAT)
         index += 1
 
-    with open(path, 'w') as file:
-        fieldnames = ['time', 'temp']
+    with path.open('w') as file:
+        fieldnames = ["time", "temp"]
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
 
@@ -51,9 +51,9 @@ def save_profile(data, path):
             writer.writerow({'time': time, 'temp': temp})
 
 
-def create_cycles(num_cycles, path):
+def create_cycles(num_cycles, path: pathlib.Path):
     # Append data to itself
-    copy(path, os.path.join(TEMPLATES, "before_cycles.csv"))
+    shutil.copy(path, TEMPLATES.join("before_cycles.csv"))
     contents = load_profile(path)
 
     if float(contents[0][1]) != float(contents[-1][1]):

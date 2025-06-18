@@ -1,16 +1,15 @@
 # Import standard python libraries
 import tkinter as tk
-import tkinter.simpledialog
-from shutil import copy
+import tkinter.ttk as ttk
+import pathlib
 
 # Importing source code
 from src.edit_controller import load_profile, save_profile, create_cycles
 
-FILE_PATH = 'resources/templates/profile.csv'
-TEMPLATES = 'resources/templates'
+TEMPLATES = pathlib.Path("resources/templates")
 
 
-class TwoEntryDialog(tkinter.simpledialog.Dialog):
+class TwoEntryDialog(tk.simpledialog.Dialog):
 
     def __init__(self, parent, title=None, text1=None, text2=None):
         self.text1 = text1
@@ -35,12 +34,9 @@ class TwoEntryDialog(tkinter.simpledialog.Dialog):
 
 class Edit_Window(tk.Toplevel):
 
-    REFRESH_INTERVAL_MS = 10000
-
     def __init__(self, root):
         self.root = root
-        self.default_bg = self.root.cget('bg')
-        super().__init__(self.root, bg=self.default_bg)
+        super().__init__(self.root)
 
         # Set standard window size
         self.geometry("854x480")
@@ -52,31 +48,27 @@ class Edit_Window(tk.Toplevel):
         self.title("Edit profile")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-        self.status = tk.Label(self, text="", bd=1, relief=tk.SUNKEN,
-                               anchor=tk.N, justify=tk.CENTER)
-        self.status.pack(fill=tk.X, side=tk.TOP, pady=1)
-
-        main_frame = tk.Frame(self)
+        main_frame = ttk.Frame(self)
         main_frame.pack(side="top", fill="both", expand=True)
 
-        self.menu = tk.Frame(main_frame, bg=self.default_bg)
-        self.menu.pack(side="top", fill="x")
+        self.menu_frame = ttk.Frame(main_frame)
+        self.menu_frame.pack(side="top", fill="x")
         self._build_menu()
 
         self.canvas = tk.Canvas(main_frame)
         self.canvas.pack(side="left", fill="both", expand=True)
 
-        scrollbar = tk.Scrollbar(
+        scrollbar = ttk.Scrollbar(
             main_frame, orient="vertical", command=self.canvas.yview)
         scrollbar.pack(side="right", fill="y")
 
         self.canvas.configure(yscrollcommand=scrollbar.set)
 
-        self.entries_frame = tk.Frame(self.canvas)
+        self.entries_frame = ttk.Frame(self.canvas)
         self.entries_frame.pack(anchor=tk.CENTER)
         self.canvas.create_window(
             (0, 0), window=self.entries_frame, anchor="n")
-        self.entries_frame.bind('<Configure>', lambda e: self.canvas.configure(
+        self.entries_frame.bind("<Configure>", lambda e: self.canvas.configure(
             scrollregion=self.canvas.bbox("all")))
 
         self.bind_all("<Button-4>", self.on_mousewheel)
@@ -86,26 +78,35 @@ class Edit_Window(tk.Toplevel):
         self.refresh()
 
     def _build_menu(self):
-        buttons_frame = tk.Frame(self.menu, bg=self.default_bg)
-        buttons_frame.grid(row=1)
+        menu = tk.Menu(self.menu_frame, tearoff=0)
+        self.config(menu=menu)
 
-        tk.Button(buttons_frame, text="Add entry", command=self.add_entry).grid(
-            row=0, column=0, padx=2, pady=1)
-        tk.Button(buttons_frame, text="Save", command=self.save).grid(
-            row=0, column=1, padx=2, pady=1)
-        tk.Button(buttons_frame, text="Save profile as", command=self.save_as).grid(
-            row=0, column=2, padx=2, pady=1)
-        tk.Button(buttons_frame, text="Load Profile", command=self.load_from_file).grid(
-            row=0, column=3, padx=2, pady=1)
-        tk.Button(buttons_frame, text="Create Cycles", command=self.generate_cycles).grid(
-            row=0, column=4, padx=2, pady=1)
+        self.profile_menu = tk.Menu(menu, tearoff=0)
+        menu.add_cascade(label="Profile", menu=self.profile_menu)
+        self.profile_menu.add_command(label="Add entry",
+                                      command=self.add_entry)
+        self.profile_menu.add_command(label="Save",
+                                      command=self.save)
+        self.profile_menu.add_command(label="Save as",
+                                      command=self.save_as)
+        self.profile_menu.add_command(label="Load",
+                                      command=self.load)
+        self.profile_menu.add_command(label="Create Cycles",
+                                      command=self.generate_cycles)
 
-        labels_frame = tk.Frame(self.menu, bg=self.default_bg)
-        labels_frame.grid(row=2, pady=1, sticky="w")
-        l1 = tk.Label(labels_frame, text="Time (DD:HH:MM)", bg=self.default_bg)
-        l1.grid(row=0, column=0, padx=40, pady=1, sticky="w")
-        l2 = tk.Label(labels_frame, text="Temperature (C)", bg=self.default_bg)
-        l2.grid(row=0, column=1, padx=30, pady=1, sticky="w")
+        buttons_frame = ttk.Frame(self.menu_frame)
+        buttons_frame.grid(row=0, column=0)
+
+        ttk.Button(buttons_frame, text="Add entry", command=self.add_entry,
+                   image=self.root.button_open.image).grid(row=0, column=0)
+        ttk.Button(buttons_frame, text="Save", command=self.save,
+                   image=self.root.button_save.image).grid(row=0, column=1)
+        ttk.Button(buttons_frame, text="Save as", command=self.save_as,
+                   image=self.root.button_save_as.image).grid(row=0, column=2)
+        ttk.Button(buttons_frame, text="Load Profile",
+                   command=self.load).grid(row=0, column=3)
+        ttk.Button(buttons_frame, text="Create Cycles",
+                   command=self.generate_cycles).grid(row=0, column=4)
 
     def on_closing(self):
         self.unbind_all("<Button-4>")
@@ -120,36 +121,38 @@ class Edit_Window(tk.Toplevel):
 
         self.canvas.yview_scroll(direction, "units")
 
-    def set_status(self, message, color):
-        self.status.config(text=message, bg=color)
-        self.after(self.REFRESH_INTERVAL_MS, self.clear_status)
-
-    def clear_status(self):
-        self.status.config(text="", bg="#d9d9d9")
-
     def refresh(self):
+
         for widget in self.entries_frame.winfo_children():
             widget.destroy()
+
+        l1 = ttk.Label(self.entries_frame, text="Time (DD:HH:MM)")
+        l1.grid(row=0, column=0)
+        l2 = ttk.Label(self.entries_frame, text="Temperature (C)")
+        l2.grid(row=0, column=1)
 
         self.entries.clear()
 
         try:
-            data = load_profile(FILE_PATH)
-        except Exception:
-            self.set_status("Could not load profile", "red")
+            path = self.root.controller.profile_path
+            data = load_profile(path)
+        except Exception as err:
+            print(err)
+            tk.messagebox.showerror(
+                title="Error!", message="Could not load profile.")
             return
 
-        for i, (time, temp) in enumerate(data):
-            time_entry = tk.Entry(self.entries_frame)
+        for i, (time, temp) in enumerate(data, start=1):
+            time_entry = ttk.Entry(self.entries_frame)
             time_entry.insert(0, time)
             time_entry.grid(row=i, column=0, padx=2, pady=1)
 
-            temp_entry = tk.Entry(self.entries_frame)
+            temp_entry = ttk.Entry(self.entries_frame)
             temp_entry.insert(0, temp)
             temp_entry.grid(row=i, column=1, padx=2, pady=1)
 
-            bt_del = tk.Button(self.entries_frame, text="Delete", activebackground="firebrick1",
-                               command=lambda idx=i: self.delete(idx))
+            bt_del = ttk.Button(self.entries_frame, text="Delete",
+                                command=lambda idx=i-1: self.delete(idx))
             bt_del.grid(row=i, column=2, padx=2, pady=1)
 
             self.entries.append([time_entry, temp_entry])
@@ -158,34 +161,35 @@ class Edit_Window(tk.Toplevel):
         dialog = TwoEntryDialog(
             self, text1="Time (DD:HH:MM)", text2="Temp (C)")
         if not dialog.result:
-            self.set_status("Nothing was entered", "red")
             return
         time = dialog.result[0]
         temp = dialog.result[1]
-        add_time = tk.Entry(self.entries_frame)
+
+        add_time = ttk.Entry(self.entries_frame)
+        add_temp = ttk.Entry(self.entries_frame)
         add_time.insert(0, time)
-        add_temp = tk.Entry(self.entries_frame)
         add_temp.insert(0, temp)
         self.entries.append([add_time, add_temp])
         self.save()
 
-    def save(self, path=FILE_PATH):
+    def save(self):
+        path = self.root.controller.profile_path
         try:
             entry_data = [(e[0].get(), e[1].get()) for e in self.entries]
             save_profile(entry_data, path)
-            self.set_status("Saved!", "green")
         except Exception:
-            self.set_status("Error while trying to save profile!", "red")
+            tk.messagebox.showerror(
+                title="Error!", message="Unable to save profile!")
         self.refresh()
         self.root.get_new_profile()
 
     def save_as(self):
-        path = tk.filedialog.asksaveasfilename(
-            initialdir=TEMPLATES, defaultextension=".csv")
-        if path is None or path == () or path.strip() == "":
+        path = tk.filedialog.asksaveasfilename(initialdir=TEMPLATES, filetypes=[
+            ("*.csv", "*.csv")])
+        if path == ():
             return
+        self.root.controller.profile_path = pathlib.Path(path)
         self.save()
-        self.save(path)
 
     def delete(self, index):
         self.entries[index][0].destroy()
@@ -193,31 +197,17 @@ class Edit_Window(tk.Toplevel):
         self.entries.pop(index)
         self.save()
 
-    def load_from_file(self):
-        filename = tk.filedialog.askopenfilename(initialdir=TEMPLATES)
-
-        if filename is None or len(filename) == 0:
-            msg = f"File with {filename} does not exist"
-            self.set_status(msg, "red")
-            return
-
-        copy(filename, FILE_PATH)
+    def load(self):
+        self.root.load_profile()
         self.refresh()
 
     def generate_cycles(self):
         num_cycles = tk.simpledialog.askinteger(
-            self, "Enter the number of cycles (>= 2)")
-
-        if num_cycles is None:
-            msg = "Nothing was entered"
-            self.set_status("Nothing was entered!", "red")
+            title="Create Cycles", prompt="Enter the number x of cycles. x>=2", minvalue=2)
+        if not num_cycles:
             return
 
-        if num_cycles < 2:
-            msg = "Incorrect number of cycles specified: " + str(num_cycles)
-            self.set_status(msg, "red")
-            return
-
-        create_cycles(num_cycles, FILE_PATH)
+        path = self.root.controller.profile_path
+        create_cycles(num_cycles, path)
         self.refresh()
         self.root.get_new_profile()
