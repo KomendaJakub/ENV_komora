@@ -242,7 +242,9 @@ class App(tk.Tk):
         temp = float(round(get_measurement(), 2))
         result = self.controller.add_data_point(temp)
 
-        if result == 'day_change':
+        if result == "hour_change":
+            self.save()
+        elif result == "day_change":
             self.save()
 
         self.update_plot()
@@ -258,11 +260,11 @@ class App(tk.Tk):
 
         # Format plot
         self.ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
-        plt.xticks(rotation=45, ha='right')
+        plt.xticks(rotation=45, ha="right")
         plt.subplots_adjust(bottom=0.30)
-        plt.title('Temperature over Time')
-        plt.xlabel('Time')
-        plt.ylabel('Temperature (deg C)')
+        plt.title("Temperature over Time")
+        plt.xlabel("Time")
+        plt.ylabel("Temperature (deg C)")
         plt.legend()
         self.canvas.draw()
 
@@ -278,6 +280,7 @@ class App(tk.Tk):
 
     def get_new_profile(self):
         self.controller.recalculate()
+        self.after(self.REFRESH_INTERVAL_MS, self.save)
 
     def export(self):
         email = tk.simpledialog.askstring(

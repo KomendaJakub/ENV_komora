@@ -9,9 +9,11 @@ import json
 import pathlib
 import tempfile
 import shutil
+from typing import Generator
 
 
 CONFIG_PATH = pathlib.Path("resources/confidential.json")
+TIME_FORMAT = "%H:%M:%S"
 
 
 @dataclasses.dataclass
@@ -31,10 +33,10 @@ class Controller():
     measurement_path: pathlib.Path = None
     profile_path: pathlib.Path = None
     temp_save: bool = True
+    partial_data: io.StringIO = dataclasses.field(default_factory=io.StringIO)
+    profiler: Generator[float | None, dt.datetime, None] = None
 
     def add_data_point(self, measurement: float) -> str:
-
-        # Add new values to the list
         delta_t = (dt.datetime.now() - self.delay) - \
             self.start_t
 
@@ -43,16 +45,20 @@ class Controller():
             return "hour_change"
 
         if delta_t > (self.day)*dt.timedelta(days=1):
+            self.daily_save()
             self.day += 1
             return "day_change"
 
         temporary = dt.datetime.strptime(
-            str(delta_t - (self.day - 1)*dt.timedelta(days=1)), "%H:%M:%S.%f")
+            str(delta_t - (self.day - 1)*dt.timedelta(days=1)), TIME_FORMAT + ".%f")
 
-        self.times.append(temporary.strftime("%H:%M:%S"))
+        self.times.append(temporary.strftime(TIME_FORMAT))
         self.real_temps.append(measurement)
-        self.target_temps.append(
-            self.get_profile(delta_t))
+        if self.profiler is not None:
+            self.target_temps.append(
+                self.profiler.send(delta_t + dt.timedelta(days=1)))
+        else:
+            self.target_temps.append(None)
 
         self.last_event_t = dt.datetime.now()
         return "ok"
@@ -73,49 +79,125 @@ class Controller():
         self.paused = False
 
     def recalculate(self):
+        self.profiler = self.get_profiler(None)
+        next(self.profiler)
+        # Using a generator
+        # The order of recalculation matters
+        # old data -> today's data
+
+        # Recalculate old data
+        pos = self.partial_data.seek(0, io.SEEK_END)
+        if pos != 0:
+            time_vals = []
+            real_temps = []
+            self.partial_data.seek(0, io.SEEK_SET)
+            for line in self.partial_data:
+                line = line.strip()
+                time, real_temp, _ = line.split(',')
+                time_vals.append(time)
+                real_temps.append(real_temp)
+
+            temp = map(lambda time: dt.datetime.strptime(
+                time, "%d:" + TIME_FORMAT))
+            targets = []
+            for time in temp:
+                time = dt.timedelta(
+                    days=time.day, hours=time.hour, minutes=time.minute, seconds=time.second)
+                targets.append(self.profiler.send(time))
+                #            targets = map(lambda time: self.get_profile(dt.timedelta(
+                #                days=time.day, hours=time.hour, minutes=time.minute, seconds=time.second)), temp)
+            self.partial_data.seek(0, io.SEEK_SET)
+            self.partial_data.write("time,measurement,set_temp\n")
+            for time, real, target in zip(time_vals, real_temps, targets):
+                self.partial_data.write(f"{time},{real},{target}\n")
+            self.partial_data.truncate()
+
+        # Recalculate this today's data
         temp = map(lambda time: dt.datetime.strptime(
-            time, "%H:%M:%S"), self.times)
-        res = map(lambda time: self.get_profile(
-            dt.timedelta(days=self.day - 1, hours=time.hour, minutes=time.minute, seconds=time.second)), temp)
+            time, TIME_FORMAT), self.times)
+        res = []
+        for time in temp:
+            time = dt.timedelta(days=self.day, hours=time.hour,
+                                minutes=time.minute, seconds=time.second)
+            res.append(self.profiler.send(time))
+#        res = map(lambda time: self.get_profile(
+#            dt.timedelta(days=self.day - 1, hours=time.hour, minutes=time.minute, seconds=time.second)), temp)
+
         self.target_temps.clear()
         self.target_temps.extend(res)
-        return
 
-    def get_profile(self, time: dt.datetime) -> float | None:
-        if time is None or self.profile_path is None:
-            return None
+#    def get_profile(self, time: dt.datetime) -> float | None:
+#        if time is None or self.profile_path is None:
+#            return None
+#
+#        if not self.profile_path.is_file():
+#            return None
+#
+#        time = time + dt.timedelta(days=1)
+#        last_temp = None
+#        last_time = None
+#
+#        with self.profile_path.open() as file:
+#            reader = DictReader(file)
+#            for row in reader:
+#                prof_time = dt.datetime.strptime(row['time'], "%d:%H:%M")
+#    #            prof_time.replace(year=time.year, month=time.month, day=time.day)
+#                prof_time = dt.timedelta(days=prof_time.day, hours=prof_time.hour,
+#                                         minutes=prof_time.minute, seconds=prof_time.second)
+#                prof_temp = row['temp']
+#
+#                if (prof_time > time):
+#                    if (last_time is None):
+#                        return float(prof_temp)
+#                    time_since_last = time - last_time
+#                    time_between = prof_time - last_time
+#                    delta_temp = float(prof_temp) - float(last_temp)
+#                    ret = float(last_temp) + delta_temp * \
+#                        (time_since_last/time_between)
+#                    return float(ret)
+#
+#                else:
+#                    last_time = prof_time
+#                    last_temp = prof_temp
+#
+#        return float(prof_temp)
 
-        if not self.profile_path.is_file():
-            return None
-
-        time = time + dt.timedelta(days=1)
-        last_temp = None
-        last_time = None
+    def get_profiler(self, time: dt.datetime) -> float | None:
+        # Expects time values to come in a monotonically increasing manner
+        # Assumes profile exists
+        time = yield None
+        profile = []
 
         with self.profile_path.open() as file:
             reader = DictReader(file)
             for row in reader:
                 prof_time = dt.datetime.strptime(row['time'], "%d:%H:%M")
-    #            prof_time.replace(year=time.year, month=time.month, day=time.day)
                 prof_time = dt.timedelta(days=prof_time.day, hours=prof_time.hour,
                                          minutes=prof_time.minute, seconds=prof_time.second)
-                prof_temp = row['temp']
 
-                if (prof_time > time):
-                    if (last_time is None):
-                        return float(prof_temp)
-                    time_since_last = time - last_time
-                    time_between = prof_time - last_time
-                    delta_temp = float(prof_temp) - float(last_temp)
-                    ret = float(last_temp) + delta_temp * \
-                        (time_since_last/time_between)
-                    return float(ret)
+                prof_temp = float(row['temp'])
+                profile.append({"time": prof_time, "temp": prof_temp})
 
+        prev_entry = None
+        entry = profile.pop(0)
+        while True:
+            while time > entry["time"]:
+                if len(profile) > 0:
+                    prev_entry = entry
+                    entry = profile.pop(0)
                 else:
-                    last_time = prof_time
-                    last_temp = prof_temp
-
-        return float(prof_temp)
+                    while True:
+                        time = yield prev_entry["temp"]
+            if prev_entry is None:
+                time = yield entry["temp"]
+            else:
+                # Linear interpolation of temperature
+                time_between = entry["time"] - prev_entry["time"]
+                time_since = time - prev_entry["time"]
+                delta_temp = entry["temp"] - prev_entry["temp"]
+                target = prev_entry["temp"] + delta_temp * \
+                    (time_since/time_between)
+                time = yield target
 
     def save_session(self, fig_buf: io.BytesIO, prev_path: pathlib.Path, temporary: bool) -> IOError | None:
         if temporary:
@@ -127,7 +209,7 @@ class Controller():
             new_zip = zipfile.ZipFile(
                 new_path, 'w', compression=zipfile.ZIP_DEFLATED)
             if zipfile.is_zipfile(self.measurement_path):
-                old_zip = zipfile.ZipFile(prev_path)
+                old_zip = zipfile.ZipFile(self.measurement_path)
                 self.write_figures(old_zip, new_zip, fig_buf)
                 old_zip.close()
 
@@ -198,15 +280,38 @@ class Controller():
                 dst.writestr(fig, src.read(fig))
 
     def write_profile(self, new_file: zipfile.ZipFile):
-        measurement = []
-        measurement.append("time,measurement,set_temp")
+        rollback = self.partial_data.tell()
+        if rollback == 0:
+            self.partial_data.write("time,measurement,set_temp\n")
         for time, real, target in zip(self.times, self.real_temps, self.target_temps):
-            measurement.append(f"{time},{real},{target}")
-        measurement = '\n'.join(measurement)
-        new_file.writestr("measurement.csv", measurement)
+            time = dt.datetime.strptime(time, TIME_FORMAT)
+            delta = time - dt.datetime.min
+            days = delta.days
+            rem, seconds = divmod(delta.seconds, 60)
+            hours, minutes = divmod(rem, 60)
+            time = f"{days:02}:{hours:02}:{minutes:02}:{seconds:02}"
+            self.partial_data.write(f"{time},{real},{target}\n")
+        new_file.writestr("measurement.csv", self.partial_data.getvalue())
+        # Clean up
+        self.partial_data.seek(rollback, io.SEEK_SET)
+        self.partial_data.truncate()
 
         if self.profile_path is not None:
             new_file.write(self.profile_path, self.profile_path.name)
+
+    def daily_save(self):
+        pos = self.partial_data.tell()
+        if pos == 0:
+            # This is the first day change
+            self.partial_data.write("time,measurement,set_temp\n")
+        for time, real, target in zip(self.times, self.real_temps, self.target_temps):
+            time = dt.datetime.strptime(TIME_FORMAT, time)
+            delta = time - dt.datetime()
+            days = delta.days
+            rem, seconds = divmod(delta.seconds, 60)
+            hours, minutes = divmod(rem, 60)
+            time = f"{days:02}:{hours:02}:{minutes:02}:{seconds:02}"
+            self.partial_data.write(f"{time},{real},{target}\n")
 
     def send_mail(self, address: str) -> str:
         # Load confidential data from config file
