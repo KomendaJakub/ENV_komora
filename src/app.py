@@ -14,6 +14,7 @@ import sys
 import pathlib
 import io
 import tempfile
+import datetime as dt
 
 # Importing source code
 if len(sys.argv) > 1 and sys.argv[1] == "debug":
@@ -22,7 +23,7 @@ else:
     from src.sensor import get_measurement
 
 from src.edit_window import Edit_Window
-from src.controller import Controller
+from src.controller import Controller, DataPoint
 
 TEMPLATES = pathlib.Path("resources/templates/")
 ICONS = pathlib.Path("resources/icons/")
@@ -253,18 +254,22 @@ class App(tk.Tk):
 
         # Draw x and y lists
         self.ax.clear()
-        self.ax.plot(self.controller.times, self.controller.real_temps,
-                     label="Actual Value", color="blue")
-        self.ax.plot(self.controller.times, self.controller.target_temps,
-                     label="Target", color="red")
+        data: list[DataPoint] = self.controller.data
+
+        times = [data_point.time.strftime("%H:%M:%S") for data_point in data]
+        real_temps = [data_point.real_temp for data_point in data]
+        target_temps = [data_point.target_temp for data_point in data]
+        self.ax.plot(times, real_temps, label="Actual", color="blue")
+        self.ax.plot(times, target_temps, label="Target", color="red")
 
         # Format plot
         self.ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
         plt.xticks(rotation=45, ha="right")
         plt.subplots_adjust(bottom=0.30)
-        plt.title("Temperature over Time")
-        plt.xlabel("Time")
-        plt.ylabel("Temperature (deg C)")
+        plt.title(f"{self.measurement_name.get()} {
+                  EM_DASH} Day {self.controller.day}")
+        plt.xlabel("Time (hh:mm:ss)")
+        plt.ylabel("Temperature (°C)")
         plt.legend()
         self.canvas.draw()
 
@@ -298,10 +303,10 @@ class App(tk.Tk):
             tk.messagebox.showerror(title="Error!",
                                     message="""There was an error while sending the mail. Please check your internet connection and consider saving manually.""")
 
-    def save(self, prev_path=None, temp=False):
+    def save(self, temp=False):
         fig_buffer = io.BytesIO()
         self.fig.savefig(fig_buffer, format='png', dpi=1200)
-        self.controller.save_session(fig_buffer, prev_path, temp)
+        self.controller.save_session(fig_buffer, temp)
 
     def save_as(self):
         res = tk.filedialog.asksaveasfilename(initialdir=pathlib.Path().home(),
@@ -319,7 +324,9 @@ class App(tk.Tk):
         self.button_save.configure(state=tk.NORMAL)
         self.measurement_menu.entryconfigure("Save", state=tk.DISABLED)
 
-        return self.save(prev_path)
+        fig_buffer = io.BytesIO()
+        self.fig.savefig(fig_buffer, format='png', dpi=1200)
+        return self.controller.save_as_session(fig_buffer, prev_path)
 
     def load_profile(self):
         res = tk.filedialog.askopenfilename(initialdir=TEMPLATES)

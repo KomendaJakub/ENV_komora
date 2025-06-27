@@ -10,10 +10,59 @@ import pathlib
 import tempfile
 import shutil
 from typing import Generator
+import matplotlib as plt
 
 
 CONFIG_PATH = pathlib.Path("resources/confidential.json")
-TIME_FORMAT = "%H:%M:%S"
+TIME_FORMAT = "%d:%H:%M:%S"
+PROFILE_TIME_FORMAT = "%d:%H:%M"
+EM_DASH = u'\u2014'
+
+
+class DataPoint():
+    def __init__(self, time: dt.datetime, real_temp: float, target_temp: float):
+        self.time = time
+        self.real_temp = real_temp
+        self.target_temp = target_temp
+
+    @classmethod
+    def from_str(cls, string: str):
+        time, real_temp, target_temp = string.strip().split(",")
+        time = dt.datetime.strptime(time, TIME_FORMAT)
+        real_temp = float(real_temp)
+        target_temp = float(target_temp)
+        return cls(time, real_temp, target_temp)
+
+    def __repr__(self):
+        return f"DataPoint(time={repr(self.time)}, real_temp={repr(self.real_temp)}, target_temp={repr(self.target_temp)})"
+
+    def __str__(self):
+        delta = self.time - dt.datetime.min
+        days = delta.days
+        rem, seconds = divmod(delta.seconds, 60)
+        hours, minutes = divmod(rem, 60)
+        time = f"{days:02}:{hours:02}:{minutes:02}:{seconds:02}"
+        return f"{time},{self.real_temp},{self.target_temp}"
+
+
+class ProfilePoint():
+    def __init__(self, time: dt.datetime, target_temp: float):
+        self.time = time
+        self.target_temp = target_temp
+
+    @classmethod
+    def from_str(cls, string: str):
+        time, target_temp = string.strip().split(",")
+        time = dt.datetime.strptime(time, PROFILE_TIME_FORMAT)
+        target_temp = float(target_temp)
+        return cls(time, target_temp)
+
+    def __repr__(self):
+        return f"ProfilePoint(time={repr(self.time)}, target_temp={repr(self.target_temp)})"
+
+    def __str__(self):
+        time = self.time.strftime(PROFILE_TIME_FORMAT)
+        return f"{time},{self.target_temp}"
 
 
 @dataclasses.dataclass
@@ -23,9 +72,7 @@ class Controller():
     prev_event_t: dt.datetime = None
     delay: dt.timedelta = dataclasses.field(default_factory=dt.timedelta)
     prev_delay: dt.timedelta = dataclasses.field(default_factory=dt.timedelta)
-    real_temps: list[float] = dataclasses.field(default_factory=list)
-    times: list = dataclasses.field(default_factory=list)
-    target_temps: list[float] = dataclasses.field(default_factory=list)
+    data: list[DataPoint] = dataclasses.field(default_factory=list)
     start_t: dt.datetime = dataclasses.field(default_factory=dt.datetime.now)
     day: int = 1
     hour: int = 1
@@ -33,10 +80,10 @@ class Controller():
     measurement_path: pathlib.Path = None
     profile_path: pathlib.Path = None
     temp_save: bool = True
-    partial_data: io.StringIO = dataclasses.field(default_factory=io.StringIO)
+    partial_save: io.StringIO = dataclasses.field(default_factory=io.StringIO)
     profiler: Generator[float | None, dt.datetime, None] = None
 
-    def add_data_point(self, measurement: float) -> str:
+    def add_data_point(self, real_temp: float) -> str:
         delta_t = (dt.datetime.now() - self.delay) - \
             self.start_t
 
@@ -49,16 +96,19 @@ class Controller():
             self.day += 1
             return "day_change"
 
-        temporary = dt.datetime.strptime(
-            str(delta_t - (self.day - 1)*dt.timedelta(days=1)), TIME_FORMAT + ".%f")
+        # TODO: This may be broken because of the new TIME_FORMAT
+        time = dt.datetime.strptime(
+            str(delta_t - (self.day - 1)*dt.timedelta(days=1)), "%H:%M:%S.%f")
 
-        self.times.append(temporary.strftime(TIME_FORMAT))
-        self.real_temps.append(measurement)
         if self.profiler is not None:
-            self.target_temps.append(
-                self.profiler.send(delta_t + dt.timedelta(days=1)))
+            target_temp = self.profiler.send(time)
+            # target_temp = self.profiler.send(delta_t + dt.timedelta(days=1))
         else:
-            self.target_temps.append(None)
+            target_temp = None
+
+        data_point = DataPoint(
+            time=time, real_temp=real_temp, target_temp=target_temp)
+        self.data.append(data_point)
 
         self.last_event_t = dt.datetime.now()
         return "ok"
@@ -86,123 +136,72 @@ class Controller():
         # old data -> today's data
 
         # Recalculate old data
-        pos = self.partial_data.seek(0, io.SEEK_END)
+        pos = self.partial_save.seek(0, io.SEEK_END)
         if pos != 0:
-            time_vals = []
-            real_temps = []
-            self.partial_data.seek(0, io.SEEK_SET)
-            for line in self.partial_data:
+            data = []
+            self.partial_save.seek(0, io.SEEK_SET)
+            for line in self.partial_save:
                 line = line.strip()
-                time, real_temp, _ = line.split(',')
-                time_vals.append(time)
-                real_temps.append(real_temp)
+                data_point = DataPoint.from_str(line)
+                data.append(data_point)
 
-            temp = map(lambda time: dt.datetime.strptime(
-                time, "%d:" + TIME_FORMAT))
-            targets = []
-            for time in temp:
-                time = dt.timedelta(
-                    days=time.day, hours=time.hour, minutes=time.minute, seconds=time.second)
-                targets.append(self.profiler.send(time))
-                #            targets = map(lambda time: self.get_profile(dt.timedelta(
-                #                days=time.day, hours=time.hour, minutes=time.minute, seconds=time.second)), temp)
-            self.partial_data.seek(0, io.SEEK_SET)
-            self.partial_data.write("time,measurement,set_temp\n")
-            for time, real, target in zip(time_vals, real_temps, targets):
-                self.partial_data.write(f"{time},{real},{target}\n")
-            self.partial_data.truncate()
+            self.partial_save.seek(0, io.SEEK_SET)
+            self.partial_save.write("time,measurement,set_temp\n")
+            for data_point in data:
+                data_point.target_temp = self.profiler.send(data_point.time)
+                self.partial_save.write(f"{data_point}\n")
+            self.partial_save.truncate()
 
-        # Recalculate this today's data
-        temp = map(lambda time: dt.datetime.strptime(
-            time, TIME_FORMAT), self.times)
-        res = []
-        for time in temp:
-            time = dt.timedelta(days=self.day, hours=time.hour,
-                                minutes=time.minute, seconds=time.second)
-            res.append(self.profiler.send(time))
-#        res = map(lambda time: self.get_profile(
-#            dt.timedelta(days=self.day - 1, hours=time.hour, minutes=time.minute, seconds=time.second)), temp)
+        # Recalculate today's data
+        for data_point in self.data:
+            data_point.target_temp = self.profiler.send(data_point.time)
 
-        self.target_temps.clear()
-        self.target_temps.extend(res)
-
-#    def get_profile(self, time: dt.datetime) -> float | None:
-#        if time is None or self.profile_path is None:
-#            return None
-#
-#        if not self.profile_path.is_file():
-#            return None
-#
-#        time = time + dt.timedelta(days=1)
-#        last_temp = None
-#        last_time = None
-#
-#        with self.profile_path.open() as file:
-#            reader = DictReader(file)
-#            for row in reader:
-#                prof_time = dt.datetime.strptime(row['time'], "%d:%H:%M")
-#    #            prof_time.replace(year=time.year, month=time.month, day=time.day)
-#                prof_time = dt.timedelta(days=prof_time.day, hours=prof_time.hour,
-#                                         minutes=prof_time.minute, seconds=prof_time.second)
-#                prof_temp = row['temp']
-#
-#                if (prof_time > time):
-#                    if (last_time is None):
-#                        return float(prof_temp)
-#                    time_since_last = time - last_time
-#                    time_between = prof_time - last_time
-#                    delta_temp = float(prof_temp) - float(last_temp)
-#                    ret = float(last_temp) + delta_temp * \
-#                        (time_since_last/time_between)
-#                    return float(ret)
-#
-#                else:
-#                    last_time = prof_time
-#                    last_temp = prof_temp
-#
-#        return float(prof_temp)
-
+    # TODO: Refactor so that you dont have to skip first iteration see: James Powell
     def get_profiler(self, time: dt.datetime) -> float | None:
         # Expects time values to come in a monotonically increasing manner
         # Assumes profile exists
         time = yield None
         profile = []
 
+        if self.profile_path is None:
+            while True:
+                time = yield None
+
         with self.profile_path.open() as file:
-            reader = DictReader(file)
-            for row in reader:
-                prof_time = dt.datetime.strptime(row['time'], "%d:%H:%M")
-                prof_time = dt.timedelta(days=prof_time.day, hours=prof_time.hour,
-                                         minutes=prof_time.minute, seconds=prof_time.second)
+            # Skip header
+            next(file)
+            for line in file:
+                line = line.strip()
+                profile_point = ProfilePoint.from_str(line)
+                profile.append(profile_point)
 
-                prof_temp = float(row['temp'])
-                profile.append({"time": prof_time, "temp": prof_temp})
-
-        prev_entry = None
-        entry = profile.pop(0)
+        prev_point: ProfilePoint = None
+        profile_point = profile.pop(0)
         while True:
-            while time > entry["time"]:
+            while time > profile_point.time:
                 if len(profile) > 0:
-                    prev_entry = entry
-                    entry = profile.pop(0)
+                    prev_point = profile_point
+                    profile_point = profile.pop(0)
                 else:
                     while True:
-                        time = yield prev_entry["temp"]
-            if prev_entry is None:
-                time = yield entry["temp"]
+                        if prev_point is not None:
+                            time = yield prev_point.time
+                        else:
+                            time = yield None
+            if prev_point is None:
+                time = yield profile_point.target_temp
             else:
                 # Linear interpolation of temperature
-                time_between = entry["time"] - prev_entry["time"]
-                time_since = time - prev_entry["time"]
-                delta_temp = entry["temp"] - prev_entry["temp"]
-                target = prev_entry["temp"] + delta_temp * \
+                time_between = profile_point.time - prev_point.time
+                time_since = time - prev_point.time
+                delta_temp = profile_point.target_temp - prev_point.target_temp
+                target = prev_point.target_temp + delta_temp * \
                     (time_since/time_between)
                 time = yield target
 
-    def save_session(self, fig_buf: io.BytesIO, prev_path: pathlib.Path, temporary: bool) -> IOError | None:
+    def save_session(self, fig_buf: io.BytesIO, temporary: bool) -> IOError | None:
         if temporary:
             # No user saves yet
-            assert (prev_path is None)
             new_file = tempfile.NamedTemporaryFile(delete=False)
             new_path = pathlib.Path(new_file.name)
             new_file.close()
@@ -219,10 +218,8 @@ class Controller():
             self.measurement_path = pathlib.Path(new_path)
             return
 
-        if prev_path is None:
-            # Not comming from save as
-            prev_path = self.measurement_path
-
+        # TODO: refactor this
+        prev_path = self.measurement_path
         # !Symlinks not handled
         if prev_path.match(self.measurement_path):
             # Saving to the same file
@@ -261,7 +258,58 @@ class Controller():
             self.temp_save = False
             return
 
-        assert (False and "Error while saving: Unreachable!")
+        assert False, "Unreachable!"
+
+    def save_as_session(self, fig_buf: io.BytesIO) -> IOError | None:
+        assert False, "Not fully implemented"
+        self.profiler = self.get_profiler()
+        next(self.profiler)
+        day = 1
+        line = self.partial_save.readline()
+        real_temps = []
+        target_temps = []
+        times = []
+        while line != "":
+            line = self.partial_save.readline()
+            time, real_temp, target_temp = line.strip().split(',')
+            real_temp = float(real_temp)
+            target_temp = float(target_temp)
+            time = dt.datetime.strptime(time, "%d:" + TIME_FORMAT)
+            if time.day < day:
+                times.append(time)
+                real_temps.append(real_temp)
+                target_temps.append(target_temp)
+            else:
+                # plot values that you have collected
+                fig = plt.figure()
+                ax = fig.add_subplot(1, 1, 1)
+                ax.plot(times, real_temps, label="Actual", color="blue")
+                ax.plot(times, target_temps,
+                        label="Target", color="red")
+
+                # Format plot
+                ax.xaxis.set_major_locator(plt.ticker.MaxNLocator(10))
+                plt.xticks(rotation=45, ha="right")
+                plt.subplots_adjust(bottom=0.30)
+                plt.title(f"{self.measurement_name.get()} {
+                          EM_DASH} Day {self.controller.day}")
+                plt.xlabel("Time (hh:mm:ss)")
+                plt.ylabel("Temperature (°C)")
+                plt.legend()
+
+                # dispose of the values and append new values
+                times.clear()
+                real_temps.clear()
+                target_temps.clear()
+                times.append(time)
+                real_temps.append(real_temp)
+                target_temps.append(target_temp)
+                day += 1
+
+        pass
+
+    def plot(self, dst: zipfile.ZipFile, times: [dt.datetime], ) -> None:
+        pass
 
     def write_figures(self, src: zipfile.ZipFile, dst: zipfile.ZipFile, fig_buf: io.BytesIO):
         figures = src.namelist()
@@ -280,38 +328,27 @@ class Controller():
                 dst.writestr(fig, src.read(fig))
 
     def write_profile(self, new_file: zipfile.ZipFile):
-        rollback = self.partial_data.tell()
+        rollback = self.partial_save.seek(0, io.SEEK_END)
+        self.partial_save.seek(0, io.SEEK_SET)
         if rollback == 0:
-            self.partial_data.write("time,measurement,set_temp\n")
-        for time, real, target in zip(self.times, self.real_temps, self.target_temps):
-            time = dt.datetime.strptime(time, TIME_FORMAT)
-            delta = time - dt.datetime.min
-            days = delta.days
-            rem, seconds = divmod(delta.seconds, 60)
-            hours, minutes = divmod(rem, 60)
-            time = f"{days:02}:{hours:02}:{minutes:02}:{seconds:02}"
-            self.partial_data.write(f"{time},{real},{target}\n")
-        new_file.writestr("measurement.csv", self.partial_data.getvalue())
+            self.partial_save.write("time,measurement,set_temp\n")
+        for data_point in self.data:
+            self.partial_save.write(f"{data_point}\n")
+        new_file.writestr("measurement.csv", self.partial_save.getvalue())
         # Clean up
-        self.partial_data.seek(rollback, io.SEEK_SET)
-        self.partial_data.truncate()
+        self.partial_save.seek(rollback, io.SEEK_SET)
+        self.partial_save.truncate()
 
         if self.profile_path is not None:
             new_file.write(self.profile_path, self.profile_path.name)
 
     def daily_save(self):
-        pos = self.partial_data.tell()
+        pos = self.partial_save.seek(0, io.SEEK_END)
         if pos == 0:
             # This is the first day change
-            self.partial_data.write("time,measurement,set_temp\n")
-        for time, real, target in zip(self.times, self.real_temps, self.target_temps):
-            time = dt.datetime.strptime(TIME_FORMAT, time)
-            delta = time - dt.datetime()
-            days = delta.days
-            rem, seconds = divmod(delta.seconds, 60)
-            hours, minutes = divmod(rem, 60)
-            time = f"{days:02}:{hours:02}:{minutes:02}:{seconds:02}"
-            self.partial_data.write(f"{time},{real},{target}\n")
+            self.partial_save.write("time,measurement,set_temp\n")
+        for data_point in self.data:
+            self.partial_save.write(f"{data_point}\n")
 
     def send_mail(self, address: str) -> str:
         # Load confidential data from config file
