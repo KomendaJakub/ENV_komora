@@ -1,6 +1,5 @@
 import datetime as dt
 import dataclasses
-from csv import DictReader
 import zipfile
 import io
 from email.message import EmailMessage
@@ -10,7 +9,8 @@ import pathlib
 import tempfile
 import shutil
 from typing import Generator
-import matplotlib as plt
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 
 CONFIG_PATH = pathlib.Path("resources/confidential.json")
@@ -37,7 +37,7 @@ class DataPoint():
         return f"DataPoint(time={repr(self.time)}, real_temp={repr(self.real_temp)}, target_temp={repr(self.target_temp)})"
 
     def __str__(self):
-        delta = self.time - dt.datetime.min
+        delta = self.time - dt.datetime(year=1899, month=12, day=31)
         days = delta.days
         rem, seconds = divmod(delta.seconds, 60)
         hours, minutes = divmod(rem, 60)
@@ -218,98 +218,81 @@ class Controller():
             self.measurement_path = pathlib.Path(new_path)
             return
 
-        # TODO: refactor this
-        prev_path = self.measurement_path
-        # !Symlinks not handled
-        if prev_path.match(self.measurement_path):
-            # Saving to the same file
-            was_zip = zipfile.is_zipfile(self.measurement_path)
-            if was_zip:
-                tempdir = tempfile.TemporaryDirectory()
-                temp_path = pathlib.Path(tempdir.name)
-                old_zip = pathlib.Path(shutil.move(
-                    self.measurement_path, temp_path.joinpath("temp.zip")))
-                old_zip = zipfile.ZipFile(old_zip, 'r')
+        # Permanent save
+        path = self.measurement_path
+        was_zip = zipfile.is_zipfile(path)
+        if was_zip:
+            tempdir = tempfile.TemporaryDirectory()
+            temp_path = pathlib.Path(tempdir.name)
+            old_zip = pathlib.Path(shutil.move(
+                self.measurement_path, temp_path.joinpath("temp.zip")))
+            old_zip = zipfile.ZipFile(old_zip, 'r')
 
-            new_zip = zipfile.ZipFile(
-                self.measurement_path, 'w', compression=zipfile.ZIP_DEFLATED)
+        new_zip = zipfile.ZipFile(
+            self.measurement_path, 'w', compression=zipfile.ZIP_DEFLATED)
 
-            if was_zip:
-                self.write_figures(old_zip, new_zip, fig_buf)
-                old_zip.close()
-                tempdir.cleanup()
+        if was_zip:
+            self.write_figures(old_zip, new_zip, fig_buf)
+            old_zip.close()
+            tempdir.cleanup()
 
-            self.write_profile(new_zip)
-            new_zip.close()
-            return
-
-        if self.temp_save:
-            # This was the first save as
-            new_zip = zipfile.ZipFile(
-                self.measurement_path, 'w', compression=zipfile.ZIP_DEFLATED)
-            if zipfile.is_zipfile(prev_path):
-                old_zip = zipfile.ZipFile(prev_path, 'r')
-                self.write_figures(old_zip, new_zip, fig_buf)
-                old_zip.close()
-
-            self.write_profile(new_zip)
-            new_zip.close()
-            prev_path.unlink()
-            self.temp_save = False
-            return
+        self.write_profile(new_zip)
+        new_zip.close()
+        return
 
         assert False, "Unreachable!"
 
-    def save_as_session(self, fig_buf: io.BytesIO) -> IOError | None:
-        assert False, "Not fully implemented"
-        self.profiler = self.get_profiler()
-        next(self.profiler)
-        day = 1
-        line = self.partial_save.readline()
-        real_temps = []
-        target_temps = []
-        times = []
-        while line != "":
-            line = self.partial_save.readline()
-            time, real_temp, target_temp = line.strip().split(',')
-            real_temp = float(real_temp)
-            target_temp = float(target_temp)
-            time = dt.datetime.strptime(time, "%d:" + TIME_FORMAT)
-            if time.day < day:
-                times.append(time)
-                real_temps.append(real_temp)
-                target_temps.append(target_temp)
-            else:
-                # plot values that you have collected
-                fig = plt.figure()
-                ax = fig.add_subplot(1, 1, 1)
-                ax.plot(times, real_temps, label="Actual", color="blue")
-                ax.plot(times, target_temps,
-                        label="Target", color="red")
+    def save_as_session(self) -> IOError | None:
+        with zipfile.ZipFile(self.measurement_path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+            self.write_profile(archive)
+            length = self.partial_save.seek(0, io.SEEK_END)
+            # Plot previous data
+            if length != 0:
+                self.partial_save.seek(0, io.SEEK_SET)
+                self.partial_save.readline()
+                day = 1
+                data: list[DataPoint] = []
+                for line in self.partial_save.readlines():
+                    data_point = DataPoint.from_str(line.strip())
+                    if data_point.time.day <= day:
+                        data.append(data_point)
+                    else:
+                        self.plot(archive, data, day)
+                        data.clear()
+                        data.append(data_point)
+                        day += 1
 
-                # Format plot
-                ax.xaxis.set_major_locator(plt.ticker.MaxNLocator(10))
-                plt.xticks(rotation=45, ha="right")
-                plt.subplots_adjust(bottom=0.30)
-                plt.title(f"{self.measurement_name.get()} {
-                          EM_DASH} Day {self.controller.day}")
-                plt.xlabel("Time (hh:mm:ss)")
-                plt.ylabel("Temperature (°C)")
-                plt.legend()
+            # Plot todays data
+            self.plot(archive, self.data, self.day)
+        self.temp_save = False
 
-                # dispose of the values and append new values
-                times.clear()
-                real_temps.clear()
-                target_temps.clear()
-                times.append(time)
-                real_temps.append(real_temp)
-                target_temps.append(target_temp)
-                day += 1
-
-        pass
-
-    def plot(self, dst: zipfile.ZipFile, times: [dt.datetime], ) -> None:
-        pass
+    def plot(self, dst: zipfile.ZipFile, data: list[DataPoint], day: int) -> None:
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ax.clear()
+        times = [data_point.time.strftime(
+            "%H:%M:%S") for data_point in data]
+        real_temps = [
+            data_point.real_temp for data_point in data]
+        target_temps = [
+            data_point.target_temp for data_point in data]
+        ax.plot(times, real_temps,
+                label="Actual", color="blue")
+        ax.plot(times, target_temps,
+                label="Target", color="red")
+        # Format plot
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
+        plt.xticks(rotation=45, ha="right")
+        plt.subplots_adjust(bottom=0.30)
+        measurement_name = self.measurement_path.stem
+        plt.title(f"{measurement_name} {
+            EM_DASH} Day {day}")
+        plt.xlabel("Time (hh:mm:ss)")
+        plt.ylabel("Temperature (°C)")
+        plt.legend()
+        with dst.open(f"figures/day{day}", 'w') as file:
+            fig.savefig(file, format='png', dpi=1200)
+        plt.close(fig)
 
     def write_figures(self, src: zipfile.ZipFile, dst: zipfile.ZipFile, fig_buf: io.BytesIO):
         figures = src.namelist()

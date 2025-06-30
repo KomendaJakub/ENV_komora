@@ -14,7 +14,6 @@ import sys
 import pathlib
 import io
 import tempfile
-import datetime as dt
 
 # Importing source code
 if len(sys.argv) > 1 and sys.argv[1] == "debug":
@@ -251,7 +250,6 @@ class App(tk.Tk):
         self.update_plot()
 
     def update_plot(self):
-
         # Draw x and y lists
         self.ax.clear()
         data: list[DataPoint] = self.controller.data
@@ -316,7 +314,6 @@ class App(tk.Tk):
         res = pathlib.Path(res.strip())
         res = res.with_suffix(".zip")
 
-        prev_path = self.controller.measurement_path
         self.controller.measurement_path = res
         self.measurement_name.set(res.name)
         self.title(
@@ -324,9 +321,8 @@ class App(tk.Tk):
         self.button_save.configure(state=tk.NORMAL)
         self.measurement_menu.entryconfigure("Save", state=tk.DISABLED)
 
-        fig_buffer = io.BytesIO()
-        self.fig.savefig(fig_buffer, format='png', dpi=1200)
-        return self.controller.save_as_session(fig_buffer, prev_path)
+        self.controller.save_as_session()
+        self.update_plot()
 
     def load_profile(self):
         res = tk.filedialog.askopenfilename(initialdir=TEMPLATES)
