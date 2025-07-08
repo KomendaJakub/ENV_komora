@@ -10,6 +10,7 @@ from functools import partial
 import matplotlib.ticker as ticker
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
+import datetime as dt
 import sys
 import pathlib
 import io
@@ -254,7 +255,14 @@ class App(tk.Tk):
         self.ax.clear()
         data: list[DataPoint] = self.controller.data
 
-        times = [data_point.time.strftime("%H:%M:%S") for data_point in data]
+        times = []
+
+        for data_point in data:
+            quot, seconds = divmod(data_point.duration.seconds, 60)
+            hours, minutes = divmod(quot, 60)
+            time = f"{hours:02}:{minutes:02}:{seconds:02}"
+            times.append(time)
+
         real_temps = [data_point.real_temp for data_point in data]
         target_temps = [data_point.target_temp for data_point in data]
         self.ax.plot(times, real_temps, label="Actual", color="blue")

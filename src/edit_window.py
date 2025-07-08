@@ -126,7 +126,7 @@ class Edit_Window(tk.Toplevel):
         for widget in self.entries_frame.winfo_children():
             widget.destroy()
 
-        l1 = ttk.Label(self.entries_frame, text="Time (DD:HH:MM)")
+        l1 = ttk.Label(self.entries_frame, text="Time (HH:MM)")
         l1.grid(row=0, column=0)
         l2 = ttk.Label(self.entries_frame, text="Temperature (C)")
         l2.grid(row=0, column=1)
@@ -159,7 +159,7 @@ class Edit_Window(tk.Toplevel):
 
     def add_entry(self):
         dialog = TwoEntryDialog(
-            self, text1="Time (DD:HH:MM)", text2="Temp (C)")
+            self, text1="Time (HH:MM)", text2="Temp (C)")
         if not dialog.result:
             return
         time = dialog.result[0]

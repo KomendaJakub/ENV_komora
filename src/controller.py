@@ -20,49 +20,55 @@ EM_DASH = u'\u2014'
 
 
 class DataPoint():
-    def __init__(self, time: dt.datetime, real_temp: float, target_temp: float):
-        self.time = time
+    # duration of internal time from the beginning of measurement
+    def __init__(self, duration: dt.timedelta, real_temp: float, target_temp: float):
+        self.duration = duration
         self.real_temp = real_temp
         self.target_temp = target_temp
 
     @classmethod
     def from_str(cls, string: str):
-        time, real_temp, target_temp = string.strip().split(",")
-        time = dt.datetime.strptime(time, TIME_FORMAT)
+        duration, real_temp, target_temp = string.strip().split(",")
+        hours, minutes, seconds = duration.strip().split(":")
+        duration = dt.timedelta(hours=hours, minutes=minutes, seconds=seconds)
         real_temp = float(real_temp)
         target_temp = float(target_temp)
-        return cls(time, real_temp, target_temp)
+        return cls(duration, real_temp, target_temp)
 
     def __repr__(self):
-        return f"DataPoint(time={repr(self.time)}, real_temp={repr(self.real_temp)}, target_temp={repr(self.target_temp)})"
+        return f"DataPoint(duration={repr(self.duration)}, real_temp={repr(self.real_temp)}, target_temp={repr(self.target_temp)})"
 
     def __str__(self):
-        delta = self.time - dt.datetime(year=1899, month=12, day=31)
-        days = delta.days
-        rem, seconds = divmod(delta.seconds, 60)
-        hours, minutes = divmod(rem, 60)
-        time = f"{days:02}:{hours:02}:{minutes:02}:{seconds:02}"
-        return f"{time},{self.real_temp},{self.target_temp}"
+        seconds = int(self.duration.total_seconds())
+        quot, seconds = divmod(seconds, 60)
+        hours, minutes = divmod(quot, 60)
+        duration = f"{hours:02}:{minutes:02}:{seconds:02}"
+        return f"{duration},{self.real_temp},{self.target_temp}"
 
 
 class ProfilePoint():
-    def __init__(self, time: dt.datetime, target_temp: float):
-        self.time = time
+    # duration of internal time from the beginning of measurement
+    def __init__(self, duration: dt.datetime, target_temp: float):
+        self.duration = duration
         self.target_temp = target_temp
 
     @classmethod
     def from_str(cls, string: str):
-        time, target_temp = string.strip().split(",")
-        time = dt.datetime.strptime(time, PROFILE_TIME_FORMAT)
+        duration, target_temp = string.strip().split(",")
+        hours, minutes = map(int, duration.strip().split(":"))
+        duration = dt.timedelta(hours=hours, minutes=minutes)
         target_temp = float(target_temp)
-        return cls(time, target_temp)
+        return cls(duration, target_temp)
 
     def __repr__(self):
-        return f"ProfilePoint(time={repr(self.time)}, target_temp={repr(self.target_temp)})"
+        return f"ProfilePoint(duration={repr(self.duration)}, target_temp={repr(self.target_temp)})"
 
     def __str__(self):
-        time = self.time.strftime(PROFILE_TIME_FORMAT)
-        return f"{time},{self.target_temp}"
+        seconds = int(self.duration.total_seconds())
+        quot, seconds = divmod(seconds, 60)
+        hours, minutes = divmod(quot, 60)
+        duration = f"{hours:02}:{minutes:02}:{seconds:02}"
+        return f"{duration},{self.target_temp}"
 
 
 @dataclasses.dataclass
@@ -84,30 +90,24 @@ class Controller():
     profiler: Generator[float | None, dt.datetime, None] = None
 
     def add_data_point(self, real_temp: float) -> str:
-        delta_t = (dt.datetime.now() - self.delay) - \
-            self.start_t
+        duration = dt.datetime.now() - (self.start_t + self.delay)
 
-        if delta_t > (self.hour)*dt.timedelta(hours=1):
+        if duration > (self.hour)*dt.timedelta(hours=1):
             self.hour += 1
             return "hour_change"
 
-        if delta_t > (self.day)*dt.timedelta(days=1):
+        if duration > (self.day)*dt.timedelta(days=1):
             self.daily_save()
             self.day += 1
             return "day_change"
 
-        # TODO: This may be broken because of the new TIME_FORMAT
-        time = dt.datetime.strptime(
-            str(delta_t - (self.day - 1)*dt.timedelta(days=1)), "%H:%M:%S.%f")
-
         if self.profiler is not None:
-            target_temp = self.profiler.send(time)
-            # target_temp = self.profiler.send(delta_t + dt.timedelta(days=1))
+            target_temp = self.profiler.send(duration)
         else:
             target_temp = None
 
         data_point = DataPoint(
-            time=time, real_temp=real_temp, target_temp=target_temp)
+            duration=duration, real_temp=real_temp, target_temp=target_temp)
         self.data.append(data_point)
 
         self.last_event_t = dt.datetime.now()
@@ -148,17 +148,18 @@ class Controller():
             self.partial_save.seek(0, io.SEEK_SET)
             self.partial_save.write("time,measurement,set_temp\n")
             for data_point in data:
-                data_point.target_temp = self.profiler.send(data_point.time)
+                data_point.target_temp = self.profiler.send(
+                    data_point.duration)
                 self.partial_save.write(f"{data_point}\n")
             self.partial_save.truncate()
 
         # Recalculate today's data
         for data_point in self.data:
-            data_point.target_temp = self.profiler.send(data_point.time)
+            data_point.target_temp = self.profiler.send(data_point.duration)
 
     # TODO: Refactor so that you dont have to skip first iteration see: James Powell
-    def get_profiler(self, time: dt.datetime) -> float | None:
-        # Expects time values to come in a monotonically increasing manner
+    def get_profiler(self, time: dt.timedelta) -> float | None:
+        # Expects time values to come in a monotonically increasing order
         # Assumes profile exists
         time = yield None
         profile = []
@@ -178,22 +179,22 @@ class Controller():
         prev_point: ProfilePoint = None
         profile_point = profile.pop(0)
         while True:
-            while time > profile_point.time:
+            while time > profile_point.duration:
                 if len(profile) > 0:
                     prev_point = profile_point
                     profile_point = profile.pop(0)
                 else:
                     while True:
                         if prev_point is not None:
-                            time = yield prev_point.time
+                            time = yield prev_point.duration
                         else:
                             time = yield None
             if prev_point is None:
                 time = yield profile_point.target_temp
             else:
                 # Linear interpolation of temperature
-                time_between = profile_point.time - prev_point.time
-                time_since = time - prev_point.time
+                time_between = profile_point.duration - prev_point.duration
+                time_since = time - prev_point.duration
                 delta_temp = profile_point.target_temp - prev_point.target_temp
                 target = prev_point.target_temp + delta_temp * \
                     (time_since/time_between)
@@ -254,7 +255,7 @@ class Controller():
                 data: list[DataPoint] = []
                 for line in self.partial_save.readlines():
                     data_point = DataPoint.from_str(line.strip())
-                    if data_point.time.day <= day:
+                    if data_point.duration.day <= day:
                         data.append(data_point)
                     else:
                         self.plot(archive, data, day)
@@ -270,8 +271,16 @@ class Controller():
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         ax.clear()
-        times = [data_point.time.strftime(
-            "%H:%M:%S") for data_point in data]
+        # Assumes data is just one day
+
+        times = []
+
+        for data_point in data:
+            quot, seconds = divmod(data_point.duration.seconds, 60)
+            hours, minutes = divmod(quot, 60)
+            time = f"{hours:02}:{minutes:02}:{seconds:02}"
+            times.append(time)
+
         real_temps = [
             data_point.real_temp for data_point in data]
         target_temps = [
@@ -314,7 +323,7 @@ class Controller():
         rollback = self.partial_save.seek(0, io.SEEK_END)
         self.partial_save.seek(0, io.SEEK_SET)
         if rollback == 0:
-            self.partial_save.write("time,measurement,set_temp\n")
+            self.partial_save.write("duration,measurement,set_temp\n")
         for data_point in self.data:
             self.partial_save.write(f"{data_point}\n")
         new_file.writestr("measurement.csv", self.partial_save.getvalue())
@@ -329,7 +338,7 @@ class Controller():
         pos = self.partial_save.seek(0, io.SEEK_END)
         if pos == 0:
             # This is the first day change
-            self.partial_save.write("time,measurement,set_temp\n")
+            self.partial_save.write("duration,measurement,set_temp\n")
         for data_point in self.data:
             self.partial_save.write(f"{data_point}\n")
 
