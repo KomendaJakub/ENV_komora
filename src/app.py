@@ -10,7 +10,6 @@ from functools import partial
 import matplotlib.ticker as ticker
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
-import datetime as dt
 import sys
 import pathlib
 import io
@@ -272,8 +271,8 @@ class App(tk.Tk):
         self.ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
         plt.xticks(rotation=45, ha="right")
         plt.subplots_adjust(bottom=0.30)
-        plt.title(f"{self.measurement_name.get()} {
-                  EM_DASH} Day {self.controller.day}")
+        plt.title(f"{self.measurement_name.get()}"
+                  f"{EM_DASH} Day {self.controller.day}")
         plt.xlabel("Time (hh:mm:ss)")
         plt.ylabel("Temperature (°C)")
         plt.legend()
