@@ -294,8 +294,8 @@ class Controller():
         plt.xticks(rotation=45, ha="right")
         plt.subplots_adjust(bottom=0.30)
         measurement_name = self.measurement_path.stem
-        plt.title(f"{measurement_name} {
-            EM_DASH} Day {day}")
+        plt.title(f"{measurement_name}"
+                  f"{EM_DASH} Day {day}")
         plt.xlabel("Time (hh:mm:ss)")
         plt.ylabel("Temperature (°C)")
         plt.legend()
