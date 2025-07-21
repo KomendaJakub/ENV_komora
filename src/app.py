@@ -14,6 +14,7 @@ import io
 import tempfile
 import subprocess
 import datetime as dt
+import pandas as pd
 
 # Importing source code
 if len(sys.argv) > 1 and sys.argv[1] == "debug":
@@ -366,6 +367,9 @@ class App(tk.Tk):
                 label="Target", color="red")
         ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
         plt.xticks(rotation=45, ha="right")
+        ticks = ax.get_xticks()
+        ax.set_xticklabels(pd.to_datetime(
+            ticks, unit="s").strftime("%H:%M:%S"))
         plt.subplots_adjust(bottom=0.30)
         plt.title(f"Preview of {path.name}")
         plt.xlabel("Time (hh:mm)")

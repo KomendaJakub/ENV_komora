@@ -396,10 +396,11 @@ class Controller():
 
         for point in profile:
             target.append(point.target_temp)
-            dur = int(point.duration.total_seconds())
-            quot = dur // 60
-            hours, minutes = divmod(quot, 60)
-            duration.append(f"{hours:02}:{minutes:02}")
+            # dur = int(point.duration.total_seconds())
+            # quot = dur // 60
+            # hours, minutes = divmod(quot, 60)
+            # duration.append(f"{hours:02}:{minutes:02}")
+            duration.append(int(point.duration.total_seconds()))
 
         return duration, target
 
