@@ -194,7 +194,7 @@ class Controller():
                 else:
                     while True:
                         if prev_point is not None:
-                            time = yield prev_point.duration
+                            time = yield prev_point.target_temp
                         else:
                             time = yield None
             if prev_point is None:

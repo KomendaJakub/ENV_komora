@@ -316,7 +316,7 @@ class App(tk.Tk):
         self.title(
             f"{res.name} {EM_DASH} Environmental Chamber Control")
         self.button_save.configure(state=tk.NORMAL)
-        self.measurement_menu.entryconfigure("Save", state=tk.DISABLED)
+        self.measurement_menu.entryconfigure("Save", state=tk.NORMAL)
 
         self.controller.save_as_session()
         self.update_plot()
