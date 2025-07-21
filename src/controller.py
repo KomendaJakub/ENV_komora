@@ -69,6 +69,12 @@ class ProfilePoint():
         target_temp = float(target_temp)
         return cls(duration, target_temp)
 
+    @classmethod
+    def from_xl(cls, time: str, temp: str):
+        duration = time
+        target_temp = float(temp)
+        return cls(duration, target_temp)
+
     def __repr__(self):
         return f"ProfilePoint(duration={repr(self.duration)}, target_temp={repr(self.target_temp)})"
 
@@ -400,6 +406,7 @@ class Controller():
     def parse_profile(self, path: pathlib.Path) -> [ProfilePoint]:
         profile: [ProfilePoint] = []
         file_format = path.suffix
+
         if file_format == ".csv":
             with path.open() as file:
                 # Skip header
@@ -408,15 +415,18 @@ class Controller():
                     line = line.strip()
                     profile_point = ProfilePoint.from_str(line)
                     profile.append(profile_point)
+
         elif file_format == ".xlsx":
             wb = xl.load_workbook(filename=path, data_only=True)
             ws = wb.active
             rows = iter(ws)
             next(rows)
             for row in rows:
-                t = row[0].value
+                time = row[0].value
                 temp = row[1].value
-                point = ProfilePoint.from_str(f"{t},{temp}")
+                if time is None or temp is None:
+                    break
+                point = ProfilePoint.from_xl(time=time, temp=temp)
                 profile.append(point)
         else:
             raise ValueError(f"Unsupported file format {file_format} for a profile."

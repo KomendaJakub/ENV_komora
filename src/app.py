@@ -312,7 +312,7 @@ class App(tk.Tk):
         res = res.with_suffix(".zip")
 
         self.controller.measurement_path = res
-        self.measurement_name.set(res.name)
+        self.measurement_name.set(res.stem)
         self.title(
             f"{res.name} {EM_DASH} Environmental Chamber Control")
         self.button_save.configure(state=tk.NORMAL)
