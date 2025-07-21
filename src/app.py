@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 # Importing standard python libraries
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -14,6 +12,8 @@ import sys
 import pathlib
 import io
 import tempfile
+import subprocess
+import datetime as dt
 
 # Importing source code
 if len(sys.argv) > 1 and sys.argv[1] == "debug":
@@ -21,7 +21,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "debug":
 else:
     from src.sensor import get_measurement
 
-from src.edit_window import Edit_Window
 from src.controller import Controller, DataPoint
 
 TEMPLATES = pathlib.Path("resources/templates/")
@@ -47,8 +46,10 @@ class App(tk.Tk):
         self.minsize(self.winfo_width(), self.winfo_height())
         self.resizable(True, True)
 
-        # TODO: Add and iconphoto
-        # self.iconphoto(True, tk.PhotoImage(file=path_to_logo))
+        self.icon = tk.PhotoImage(file=ICONS.joinpath("thermometer.png"))
+        self.iconphoto(True, self.icon)
+
+# <a target="_blank" href="https://icons8.com/icon/15350/thermometer">Thermometer</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a>
 
         self.profile_name = None
         self.measurement_name = None
@@ -65,7 +66,6 @@ class App(tk.Tk):
         menu.add_cascade(label="Measurement", menu=self.measurement_menu)
         self.measurement_menu.add_command(label="New",
                                           command=self.new_measurement)
-        # file_menu.add_command(label="Load")
         self.measurement_menu.add_command(label="Save",
                                           command=self.save)
         self.measurement_menu.entryconfigure("Save", state=tk.DISABLED)
@@ -82,36 +82,24 @@ class App(tk.Tk):
         self.profile_menu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="Profile", menu=self.profile_menu)
         self.profile_menu.add_command(label="Load", command=self.load_profile)
-        self.profile_menu.add_command(label="Edit",
-                                      command=lambda: Edit_Window(self))
+        self.profile_menu.add_command(
+            label="Edit", command=self.edit_profile)
         self.profile_menu.entryconfigure("Edit", state=tk.DISABLED)
-        self.profile_menu.add_command(label="Save as")
-        self.profile_menu.entryconfigure("Save as", state=tk.DISABLED)
-
-        help_menu = tk.Menu(menu, tearoff=0)
-        menu.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="Manual")
-        help_menu.add_command(label="About")
+        self.profile_menu.add_command(
+            label="Preview", command=self.preview_profile)
+        self.profile_menu.entryconfigure("Preview")
 
         # Adding buttons with pictures
         button_frame = ttk.Frame(self)
         button_frame.pack(side=tk.TOP, fill=tk.X, expand=False)
 
         # The image is stored to avoid GC
-        # TODO: Add a function that allows to load a previous measurement
         self.button_open = ttk.Button(
             button_frame, command=self.new_measurement)
         self.button_open.image = tk.PhotoImage(
             file=ICONS.joinpath("open.png"))
         self.button_open.configure(image=self.button_open.image)
         self.button_open.grid(row=0, column=0)
-
-        # self.button_edit = ttk.Button(
-        #    button_frame, command=lambda: Edit_Window(self))
-        # self.button_edit.image = tk.PhotoImage(file=ICONS.joinpath("edit.png"))
-        # self.button_edit.configure(
-        #    image=self.button_edit.image, state=tk.DISABLED)
-        # self.button_edit.grid(row=0, column=1)
 
         self.button_save = ttk.Button(
             button_frame, command=self.save)
@@ -196,6 +184,7 @@ class App(tk.Tk):
         self.measurement_menu.entryconfigure("Pause/Resume", state=tk.NORMAL)
 
         self._build_graph(self.main_frame)
+        self.controller.start_t = dt.datetime.now()
         # Set up plot to call animate() function periodically
         self.ani = animation.FuncAnimation(
             self.fig, partial(self.animate), interval=self.REFRESH_INTERVAL_MS, cache_frame_data=False)
@@ -269,13 +258,14 @@ class App(tk.Tk):
 
         # Format plot
         self.ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
-        plt.xticks(rotation=45, ha="right")
-        plt.subplots_adjust(bottom=0.30)
-        plt.title(f"{self.measurement_name.get()}"
-                  f"{EM_DASH} Day {self.controller.day}")
-        plt.xlabel("Time (hh:mm:ss)")
-        plt.ylabel("Temperature (°C)")
-        plt.legend()
+        # self.ax.set_xticks(None, rotation=45, ha="right")
+        self.ax.tick_params(axis="x", rotation=45)
+        self.fig.subplots_adjust(bottom=0.30)
+        self.ax.set_title(f"{self.measurement_name.get()}"
+                          f" {EM_DASH} Day {self.controller.day}")
+        self.ax.set_xlabel("Time (hh:mm:ss)")
+        self.ax.set_ylabel("Temperature (°C)")
+        self.fig.legend()
         self.canvas.draw()
 
     def toggle_pause(self):
@@ -310,7 +300,7 @@ class App(tk.Tk):
 
     def save(self, temp=False):
         fig_buffer = io.BytesIO()
-        self.fig.savefig(fig_buffer, format='png', dpi=1200)
+        self.fig.savefig(fig_buffer, format='png', dpi=300)
         self.controller.save_session(fig_buffer, temp)
 
     def save_as(self):
@@ -335,16 +325,67 @@ class App(tk.Tk):
         res = tk.filedialog.askopenfilename(initialdir=TEMPLATES)
         if res == '' or res == ():
             return
-        res = pathlib.Path(res)
+        path = pathlib.Path(res)
 
         # Maybe when profile is in memory do sth else
+        self.controller.profile_path = path
+        try:
+            self.controller.recalculate()
+        except Exception as err:
+            tk.messagebox.showerror(title="Error!",
+                                    message=f"""{path.name} is not a valid profile. {err}""")
+            self.controller.profile_path = None
+            return
+
         if self.profile_name is None:
             self.profile_name = tk.StringVar()
-        self.controller.profile_path = res
-        self.profile_name.set(res.name)
-        self.controller.recalculate()
-        self.profile_menu.entryconfigure("Save as", state=tk.NORMAL)
+        self.profile_name.set(path.name)
         self.profile_menu.entryconfigure("Edit", state=tk.NORMAL)
-        # self.button_edit.configure(state=tk.NORMAL)
         if self.controller.measurement_path is not None:
             self.after(self.REFRESH_INTERVAL_MS, self.save)
+
+    def preview_profile(self):
+        initial = self.controller.profile_path
+        res = tk.filedialog.askopenfilename(
+            initialdir=TEMPLATES, initialfile=initial)
+        if res == '' or res == ():
+            return
+        path = pathlib.Path(res)
+
+        try:
+            duration, target = self.controller.preview_profile(path)
+        except Exception as err:
+            tk.messagebox.showerror(title="Error!",
+                                    message=f"""{path.name} is not a valid profile. {err}""")
+            return
+
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ax.clear()
+        ax.plot(duration, target,
+                label="Target", color="red")
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
+        plt.xticks(rotation=45, ha="right")
+        plt.subplots_adjust(bottom=0.30)
+        plt.title(f"Preview of {path.name}")
+        plt.xlabel("Time (hh:mm)")
+        plt.ylabel("Temperature (°C)")
+        plt.legend()
+        fig.show()
+        try:
+            self.update_plot()
+        except AttributeError:
+            # The plot does not exist yet
+            pass
+
+    def edit_profile(self):
+        self.process = subprocess.Popen(["firejail", "--net=none", "wps",
+                                         f"{self.controller.profile_path}"])
+        self.after(self.REFRESH_INTERVAL_MS, self.check_edited)
+
+    def check_edited(self):
+        if self.process.poll() is None:
+            self.after(self.REFRESH_INTERVAL_MS, self.check_edited)
+        else:
+            self.get_new_profile()
+            self.update_plot()

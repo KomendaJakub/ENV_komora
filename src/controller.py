@@ -5,6 +5,7 @@ import io
 from email.message import EmailMessage
 import smtplib
 import json
+import openpyxl as xl
 import pathlib
 import tempfile
 import shutil
@@ -17,6 +18,14 @@ CONFIG_PATH = pathlib.Path("resources/confidential.json")
 TIME_FORMAT = "%d:%H:%M:%S"
 PROFILE_TIME_FORMAT = "%d:%H:%M"
 EM_DASH = u'\u2014'
+
+
+def skip_first(func, *args, **kwargs):
+    def wrapper(*args, **kwargs):
+        gen = func(*args, **kwargs)
+        next(gen)
+        return gen
+    return wrapper
 
 
 class DataPoint():
@@ -55,7 +64,7 @@ class ProfilePoint():
     @classmethod
     def from_str(cls, string: str):
         duration, target_temp = string.strip().split(",")
-        hours, minutes = map(int, duration.strip().split(":"))
+        hours, minutes, _ = map(int, duration.strip().split(":"))
         duration = dt.timedelta(hours=hours, minutes=minutes)
         target_temp = float(target_temp)
         return cls(duration, target_temp)
@@ -79,7 +88,7 @@ class Controller():
     delay: dt.timedelta = dataclasses.field(default_factory=dt.timedelta)
     prev_delay: dt.timedelta = dataclasses.field(default_factory=dt.timedelta)
     data: list[DataPoint] = dataclasses.field(default_factory=list)
-    start_t: dt.datetime = dataclasses.field(default_factory=dt.datetime.now)
+    start_t: dt.datetime = None
     day: int = 1
     hour: int = 1
     paused: bool = False
@@ -129,8 +138,7 @@ class Controller():
         self.paused = False
 
     def recalculate(self):
-        self.profiler = self.get_profiler(None)
-        next(self.profiler)
+        self.profiler = self.get_profiler()
         # Using a generator
         # The order of recalculation matters
         # old data -> today's data
@@ -157,24 +165,18 @@ class Controller():
         for data_point in self.data:
             data_point.target_temp = self.profiler.send(data_point.duration)
 
-    # TODO: Refactor so that you dont have to skip first iteration see: James Powell
-    def get_profiler(self, time: dt.timedelta) -> float | None:
+    @skip_first
+    def get_profiler(self) -> float | None:
         # Expects time values to come in a monotonically increasing order
         # Assumes profile exists
-        time = yield None
-        profile = []
+        path = self.profile_path
 
-        if self.profile_path is None:
+        if path is None:
             while True:
                 time = yield None
 
-        with self.profile_path.open() as file:
-            # Skip header
-            next(file)
-            for line in file:
-                line = line.strip()
-                profile_point = ProfilePoint.from_str(line)
-                profile.append(profile_point)
+        profile = self.parse_profile(path)
+        time = yield None
 
         prev_point: ProfilePoint = None
         profile_point = profile.pop(0)
@@ -380,3 +382,43 @@ class Controller():
             return "ERROR"
 
         return "ok"
+
+    def preview_profile(self, path):
+        duration = []
+        target = []
+        profile = self.parse_profile(path)
+
+        for point in profile:
+            target.append(point.target_temp)
+            dur = int(point.duration.total_seconds())
+            quot = dur // 60
+            hours, minutes = divmod(quot, 60)
+            duration.append(f"{hours:02}:{minutes:02}")
+
+        return duration, target
+
+    def parse_profile(self, path: pathlib.Path) -> [ProfilePoint]:
+        profile: [ProfilePoint] = []
+        file_format = path.suffix
+        if file_format == ".csv":
+            with path.open() as file:
+                # Skip header
+                next(file)
+                for line in file:
+                    line = line.strip()
+                    profile_point = ProfilePoint.from_str(line)
+                    profile.append(profile_point)
+        elif file_format == ".xlsx":
+            wb = xl.load_workbook(filename=path, data_only=True)
+            ws = wb.active
+            rows = iter(ws)
+            next(rows)
+            for row in rows:
+                t = row[0].value
+                temp = row[1].value
+                point = ProfilePoint.from_str(f"{t},{temp}")
+                profile.append(point)
+        else:
+            raise ValueError(f"Unsupported file format {file_format} for a profile."
+                             f"Supported formats are '.csv' and '.xlsx'.")
+        return profile
