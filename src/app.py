@@ -261,6 +261,24 @@ class App(tk.Tk):
 
         # TODO: Redraw the graph
         elif result == "day_change":
+            self.ax.clear()
+
+            # Format plot
+            self.ax.xaxis.set_major_locator(ticker.MaxNLocator(12))
+            self.ax.tick_params(axis="x", rotation=45)
+            self.fig.subplots_adjust(bottom=0.30)
+            self.ax.set_title(f"{self.measurement_name.get()}"
+                              f" {EM_DASH} Day {self.controller.day}")
+            self.ax.set_xlabel("Time (hh:mm)")
+            self.ax.set_ylabel("Temperature (°C)")
+            self.ax.set_ylim([-50, 150])
+            self.ax.set_xlim([0, 3600])
+            ticks = self.ax.get_xticks()
+            self.ax.set_xticklabels(pd.to_datetime(
+                ticks, unit="s").strftime("%H:%M"))
+
+            self.ax.legend()
+
             self.save()
 
         self.update_plot()

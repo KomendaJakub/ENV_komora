@@ -113,6 +113,7 @@ class Controller():
 
         if duration > (self.day)*dt.timedelta(days=1):
             self.daily_save()
+            self.hour = 1
             self.day += 1
             return "day_change"
 
