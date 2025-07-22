@@ -15,6 +15,7 @@ import tempfile
 import subprocess
 import datetime as dt
 import pandas as pd
+import numpy as np
 
 # Importing source code
 if len(sys.argv) > 1 and sys.argv[1] == "debug":
@@ -46,11 +47,6 @@ class App(tk.Tk):
         self.geometry()
         self.minsize(self.winfo_width(), self.winfo_height())
         self.resizable(True, True)
-
-        self.icon = tk.PhotoImage(file=ICONS.joinpath("thermometer.png"))
-        self.iconphoto(True, self.icon)
-
-# <a target="_blank" href="https://icons8.com/icon/15350/thermometer">Thermometer</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a>
 
         self.profile_name = None
         self.measurement_name = None
@@ -190,6 +186,7 @@ class App(tk.Tk):
         self.ani = animation.FuncAnimation(
             self.fig, partial(self.animate), interval=self.REFRESH_INTERVAL_MS, cache_frame_data=False)
         self.canvas.draw()
+        self.save(temp=True)
 
     def _build_graph(self, main_frame):
         graph_frame = ttk.Frame(main_frame)
@@ -197,6 +194,27 @@ class App(tk.Tk):
         # Create a figure
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(1, 1, 1)
+
+        self.plot_real_temp = self.ax.plot(
+            [], [], label="Actual", color="blue")[0]
+        self.plot_target_temp = self.ax.plot(
+            [], [], label="Target", color="red")[0]
+
+        # Format plot
+        self.ax.xaxis.set_major_locator(ticker.MaxNLocator(12))
+        self.ax.tick_params(axis="x", rotation=45)
+        self.fig.subplots_adjust(bottom=0.30)
+        self.ax.set_title(f"{self.measurement_name.get()}"
+                          f" {EM_DASH} Day {self.controller.day}")
+        self.ax.set_xlabel("Time (hh:mm)")
+        self.ax.set_ylabel("Temperature (°C)")
+        self.ax.set_ylim([-50, 150])
+        self.ax.set_xlim([0, 3600])
+        ticks = self.ax.get_xticks()
+        self.ax.set_xticklabels(pd.to_datetime(
+            ticks, unit="s").strftime("%H:%M"))
+
+        self.ax.legend()
 
         # To display figure
         self.canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
@@ -231,42 +249,37 @@ class App(tk.Tk):
         temp = float(round(get_measurement(), 2))
         result = self.controller.add_data_point(temp)
 
+        # TODO: Redraw the graph
         if result == "hour_change":
+            self.ax.set_xlim([0, 3600*self.controller.hour])
+            ticks = self.ax.get_xticks()
+            self.ax.set_xticklabels(pd.to_datetime(
+                ticks, unit="s").strftime("%H:%M"))
+
+            self.ax.legend()
             self.save()
+
+        # TODO: Redraw the graph
         elif result == "day_change":
             self.save()
 
         self.update_plot()
 
     def update_plot(self):
-        # Draw x and y lists
-        self.ax.clear()
-        data: list[DataPoint] = self.controller.data
+        data_point: DataPoint = self.controller.data[-1]
 
-        times = []
+        times, real_temps = self.plot_real_temp.get_data()
+        _, target_temps = self.plot_target_temp.get_data()
+        times = np.append(times, data_point.duration.seconds)
+        real_temps = np.append(real_temps, data_point.real_temp)
+        target_temps = np.append(target_temps, data_point.target_temp)
 
-        for data_point in data:
-            quot, seconds = divmod(data_point.duration.seconds, 60)
-            hours, minutes = divmod(quot, 60)
-            time = f"{hours:02}:{minutes:02}:{seconds:02}"
-            times.append(time)
+        self.plot_real_temp.set_xdata(times)
+        self.plot_real_temp.set_ydata(real_temps)
+        self.plot_target_temp.set_xdata(times)
+        self.plot_target_temp.set_ydata(target_temps)
 
-        real_temps = [data_point.real_temp for data_point in data]
-        target_temps = [data_point.target_temp for data_point in data]
-        self.ax.plot(times, real_temps, label="Actual", color="blue")
-        self.ax.plot(times, target_temps, label="Target", color="red")
-
-        # Format plot
-        self.ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
-        # self.ax.set_xticks(None, rotation=45, ha="right")
-        self.ax.tick_params(axis="x", rotation=45)
-        self.fig.subplots_adjust(bottom=0.30)
-        self.ax.set_title(f"{self.measurement_name.get()}"
-                          f" {EM_DASH} Day {self.controller.day}")
-        self.ax.set_xlabel("Time (hh:mm:ss)")
-        self.ax.set_ylabel("Temperature (°C)")
-        self.fig.legend()
-        self.canvas.draw()
+        return (self.plot_real_temp, self.plot_target_temp)
 
     def toggle_pause(self):
         if self.controller.paused:
@@ -346,8 +359,13 @@ class App(tk.Tk):
 
     def preview_profile(self):
         initial = self.controller.profile_path
+        if initial is None:
+            dir = TEMPLATES
+        else:
+            dir = initial.root
+
         res = tk.filedialog.askopenfilename(
-            initialdir=TEMPLATES, initialfile=initial)
+            initialdir=dir, initialfile=initial)
         if res == '' or res == ():
             return
         path = pathlib.Path(res)
