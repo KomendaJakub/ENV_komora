@@ -292,7 +292,8 @@ class App(tk.Tk):
             self.button_pause.configure(image=self.button_pause.image_resume)
 
     def get_new_profile(self):
-        self.controller.recalculate()
+        target_temps = self.controller.recalculate()
+        self.plot_target_temp.set_ydata(target_temps)
         self.after(self.REFRESH_INTERVAL_MS, self.save)
 
     def export(self):
@@ -343,7 +344,8 @@ class App(tk.Tk):
         # Maybe when profile is in memory do sth else
         self.controller.profile_path = path
         try:
-            self.controller.recalculate()
+            target_temps = self.controller.recalculate()
+            self.plot_target_temp.set_ydata(target_temps)
         except Exception as err:
             tk.messagebox.showerror(title="Error!",
                                     message=f"""{path.name} is not a valid profile. {err}""")

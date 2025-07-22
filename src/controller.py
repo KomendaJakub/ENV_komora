@@ -167,9 +167,13 @@ class Controller():
                 self.partial_save.write(f"{data_point}\n")
             self.partial_save.truncate()
 
+        target_temps = []
         # Recalculate today's data
         for data_point in self.data:
             data_point.target_temp = self.profiler.send(data_point.duration)
+            target_temps.append(data_point.target_temp)
+
+        return target_temps
 
     @skip_first
     def get_profiler(self) -> float | None:
