@@ -190,7 +190,6 @@ class App(tk.Tk):
         self.ani = animation.FuncAnimation(
             self.fig, partial(self.animate), interval=self.REFRESH_INTERVAL_MS, cache_frame_data=False)
         self.canvas.draw()
-        self.save(temp=True)
 
     def _build_graph(self, main_frame):
         graph_frame = ttk.Frame(main_frame)
