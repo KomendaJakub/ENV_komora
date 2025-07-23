@@ -101,7 +101,7 @@ class Controller():
     measurement_path: pathlib.Path = None
     profile_path: pathlib.Path = None
     temp_save: bool = True
-    partial_save: io.StringIO = dataclasses.field(default_factory=io.StringIO)
+    partial_save: pathlib.Path = None
     profiler: Generator[float | None, dt.datetime, None] = None
 
     def add_data_point(self, real_temp: float) -> str:
@@ -151,22 +151,24 @@ class Controller():
         # old data -> today's data
 
         # Recalculate old data
-        pos = self.partial_save.seek(0, io.SEEK_END)
-        if pos != 0:
-            data = []
-            self.partial_save.seek(0, io.SEEK_SET)
-            for line in self.partial_save:
-                line = line.strip()
-                data_point = DataPoint.from_str(line)
-                data.append(data_point)
+        if self.partial_save is not None:
+            with self.partial_save.open("r") as file:
+                lines = file.readlines()
 
-            self.partial_save.seek(0, io.SEEK_SET)
-            self.partial_save.write("time,measurement,set_temp\n")
-            for data_point in data:
-                data_point.target_temp = self.profiler.send(
-                    data_point.duration)
-                self.partial_save.write(f"{data_point}\n")
-            self.partial_save.truncate()
+            if len(lines) != 0:
+                data = []
+                lines = lines[1:]
+                for line in lines:
+                    line = line.strip()
+                    data_point = DataPoint.from_str(line)
+                    data.append(data_point)
+
+            with self.partial_save.open("w") as file:
+                file.write("time,measurement,set_temp\n")
+                for data_point in data:
+                    data_point.target_temp = self.profiler.send(
+                        data_point.duration)
+                    file.write(f"{data_point}\n")
 
         target_temps = []
         # Recalculate today's data
@@ -256,30 +258,32 @@ class Controller():
 
         assert False, "Unreachable!"
 
-    def save_as_session(self) -> IOError | None:
+    def save_as_session(self, fig_buffer: io.BytesIO) -> IOError | None:
         with zipfile.ZipFile(self.measurement_path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
             self.write_profile(archive)
-            length = self.partial_save.seek(0, io.SEEK_END)
-            # Plot previous data
-            if length != 0:
-                self.partial_save.seek(0, io.SEEK_SET)
-                self.partial_save.readline()
-                day = 1
-                data: list[DataPoint] = []
-                for line in self.partial_save.readlines():
-                    data_point = DataPoint.from_str(line.strip())
-                    if data_point.duration.day <= day:
-                        data.append(data_point)
-                    else:
-                        self.plot(archive, data, day)
-                        data.clear()
-                        data.append(data_point)
-                        day += 1
+            archive.writestr(f"figures/day{self.day}", fig_buffer.read())
 
-            # Plot todays data
-            self.plot(archive, self.data, self.day)
+            if self.partial_save is not None:
+                with self.partial_save.open() as file:
+                    lines = file.readlines()
+                if len(lines) != 0:
+                    lines = lines[1:]
+                    # Plot previous data
+                    day = 1
+                    data: list[DataPoint] = []
+                    for line in lines:
+                        data_point = DataPoint.from_str(line.strip())
+                        if data_point.duration.day <= day:
+                            data.append(data_point)
+                        else:
+                            self.plot(archive, data, day)
+                            data.clear()
+                            data.append(data_point)
+                            day += 1
+
         self.temp_save = False
 
+    # TODO: fix or delete
     def plot(self, dst: zipfile.ZipFile, data: list[DataPoint], day: int) -> None:
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
@@ -333,27 +337,38 @@ class Controller():
                 dst.writestr(fig, src.read(fig))
 
     def write_profile(self, new_file: zipfile.ZipFile):
-        rollback = self.partial_save.seek(0, io.SEEK_END)
-        self.partial_save.seek(0, io.SEEK_SET)
-        if rollback == 0:
-            self.partial_save.write("duration,measurement,set_temp\n")
-        for data_point in self.data:
-            self.partial_save.write(f"{data_point}\n")
-        new_file.writestr("measurement.csv", self.partial_save.getvalue())
-        # Clean up
-        self.partial_save.seek(rollback, io.SEEK_SET)
-        self.partial_save.truncate()
+        if self.partial_save is None:
+            buffer = io.StringIO()
+            buffer.write("duration,measurement,set_temp\n")
+            for data_point in self.data:
+                buffer.write(f"{data_point}\n")
+            buffer.seek(0, io.SEEK_SET)
+            new_file.writestr("measurement.csv", buffer.read())
+            buffer.close()
+
+        else:
+            with self.partial_save.open("r") as file:
+                lines = file.readlines()
+            if len(lines == 0):
+                lines.append("duration,measurement,set_temp")
+
+            for data_point in self.data:
+                lines.append(f"{data_point}")
+            new_file.writestr("measurement.csv", "\n".join(lines))
 
         if self.profile_path is not None:
             new_file.write(self.profile_path, self.profile_path.name)
 
     def daily_save(self):
-        pos = self.partial_save.seek(0, io.SEEK_END)
-        if pos == 0:
-            # This is the first day change
-            self.partial_save.write("duration,measurement,set_temp\n")
-        for data_point in self.data:
-            self.partial_save.write(f"{data_point}\n")
+        if self.partial_save is None:
+            temp_file, path = tempfile.mkstemp()
+            temp_file.write("duration,measurement,set_temp\n")
+            temp_file.close()
+            self.partial_save = pathlib.Path(path)
+
+        with self.partial_save.open("a") as file:
+            for data_point in self.data:
+                file.write(f"{data_point}\n")
 
     def send_mail(self, address: str) -> str:
         # Load confidential data from config file

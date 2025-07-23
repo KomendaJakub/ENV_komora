@@ -249,7 +249,6 @@ class App(tk.Tk):
         temp = float(round(get_measurement(), 2))
         result = self.controller.add_data_point(temp)
 
-        # TODO: Redraw the graph
         if result == "hour_change":
             self.ax.set_xlim([0, 3600*self.controller.hour])
             ticks = self.ax.get_xticks()
@@ -259,7 +258,6 @@ class App(tk.Tk):
             self.ax.legend()
             self.save()
 
-        # TODO: Redraw the graph
         elif result == "day_change":
             self.ax.clear()
 
@@ -343,18 +341,29 @@ class App(tk.Tk):
         res = pathlib.Path(res.strip())
         res = res.with_suffix(".zip")
 
+        # Update GUI
         self.controller.measurement_path = res
-        self.measurement_name.set(res.stem)
+        self.measurement_name.set(res.name)
         self.title(
             f"{res.name} {EM_DASH} Environmental Chamber Control")
         self.button_save.configure(state=tk.NORMAL)
         self.measurement_menu.entryconfigure("Save", state=tk.NORMAL)
 
-        self.controller.save_as_session()
-        self.update_plot()
+        # Update Figure
+        self.ax.set_title(f"{res.stem}"
+                          f" {EM_DASH} Day {self.controller.day}")
+        self.ax.legend()
+
+        # Save Figure
+        fig_buffer = io.BytesIO()
+        self.fig.savefig(fig_buffer, format='png', dpi=300)
+        fig_buffer.seek(0, io.SEEK_SET)
+
+        self.controller.save_as_session(fig_buffer)
 
     def load_profile(self):
-        res = tk.filedialog.askopenfilename(initialdir=TEMPLATES)
+        res = tk.filedialog.askopenfilename(
+            initialdir=TEMPLATES, filetypes=[("profile files", "*.csv *.xlsx")])
         if res == '' or res == ():
             return
         path = pathlib.Path(res)
