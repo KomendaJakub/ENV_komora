@@ -241,6 +241,9 @@ class App(tk.Tk):
             else:
                 self.save()
 
+        if self.controller.partial_save is not None:
+            self.partial_save.unlink()
+
         self.quit()
         self.destroy()
 
